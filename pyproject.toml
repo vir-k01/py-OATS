@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "py_oats"
+version = "0.0.1"
+dependencies = [
+  "pymatgen==2024.3.1",
+  "pandas",
+  "pymatgen-analysis-diffusion"
+]
+requires-python = ">=3.8"
+authors = [
+  {name = "Vir Karan", email = "virkaran@berkeley.edu"},
+]
+description = "A python package to analyze correlated ionic transport in amorphous solids."
+readme = "README.md"
