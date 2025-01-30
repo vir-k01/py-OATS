@@ -1,7 +1,7 @@
 from scipy.stats import linregress
 import numpy as np
 
-def fit_in_best_fit_interval(f: np.array[float], times: np.array[float], start: int = None, end: int = None):
+def fit_in_best_fit_interval(f: np.ndarray[float], times: np.ndarray[float], start: int = None, end: int = None):
     """
     Finds the best fit interval for a given "MSD" data set. 
     The best fit interval is the interval that minimizes the mean absolute error of the slope of the linear regression of the log-log plot of the "MSD" data.
@@ -38,7 +38,7 @@ def fit_in_best_fit_interval(f: np.array[float], times: np.array[float], start: 
     
     return slope, fit_dict
 
-def fit_with_blockavg(f: np.array[float], times: np.array[float] = None, start: int = None, end: int = None):
+def fit_with_blockavg(f: np.ndarray[float], times: np.ndarray[float] = None, start: int = None, end: int = None):
     """
     Compute block average of MSD data, excluding initial steps. Theoretically should lead to lower uncertainity in the fit.
 
@@ -77,7 +77,7 @@ def fit_with_blockavg(f: np.array[float], times: np.array[float] = None, start: 
     fit_dict = {'fit_err': std_err, 'slope_err': min_mae, 'block_length': block_length}
     return slope, fit_dict
 
-def fit_data(f: np.array[float], times: np.array[float], start: int = None, end: int = None, smoothing: str = 'best_fit'):
+def fit_data(f: np.ndarray[float], times: np.ndarray[float], start: int = None, end: int = None, smoothing: str = 'best_fit'):
     """
     Perform a linear regression.
     :param f: array[float], "MSD" or time correlation data

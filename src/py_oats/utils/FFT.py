@@ -1,6 +1,6 @@
 import numpy as np
 
-def autocorrFFT(x : np.array[float]):
+def autocorrFFT(x : np.ndarray[float]):
     """
     Calculates the autocorrelation function using the fast Fourier transform.
     :param x: array[float], function on which to compute autocorrelation function
@@ -15,7 +15,7 @@ def autocorrFFT(x : np.array[float]):
     acf = res/n
     return acf
 
-def msd_fft(r : np.array[float]):
+def msd_fft(r : np.ndarray[float]):
     """
     Computes mean square displacement using the fast Fourier transform.
     
@@ -34,7 +34,7 @@ def msd_fft(r : np.array[float]):
     msd = S1-2*S2
     return msd
 
-def cross_corr(x : np.array[float], y : np.array[float]):
+def cross_corr(x : np.ndarray[float], y : np.ndarray[float]):
     """
     Calculates cross-correlation function of x and y using the 
     fast Fourier transform.
@@ -52,7 +52,7 @@ def cross_corr(x : np.array[float], y : np.array[float]):
     cf = res/n
     return cf
 
-def msd_fft_cross(r : np.array[float], k : np.array[float]):
+def msd_fft_cross(r : np.ndarray[float], k : np.ndarray[float]):
     """
     Calculates "MSD" (cross-correlations) using the fast Fourier transform.
     :param r: array[float], positions of atom type 1 over time

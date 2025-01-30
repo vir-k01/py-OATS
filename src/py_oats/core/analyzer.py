@@ -1,7 +1,9 @@
-from pymatgen.core import Structure, Element, Trajectory
+from pymatgen.core import Structure, Element
+from pymatgen.core.trajectory import Trajectory
 from pymatgen.io.vasp import Xdatcar
 from ase.io import read
 from pymatgen.io.ase import AseAtomsAdaptor
+from pymatgen.analysis.diffusion.analyzer import DiffusionAnalyzer
 from typing import List, Union
 import numpy as np
 from ..utils.FFT import msd_fft, msd_fft_cross
@@ -24,18 +26,18 @@ class OnsagerTransportAnalyzer():
             self.species = species
         else:
             self.species = set()
-            for s in self.traj.structures[0].species:
+            for s in self.structures[0].species:
                 self.species.add(s.symbol)
             self.species = list(self.species)
         
         for s, c in zip(self.species, range(len(self.species))):
-            self.mapping[s] = np.argwhere(self.species)[c][0]
+            self.mapping[s] = int(np.argwhere(self.species)[c][0])
 
         self.temperature = temperature
         self.time_step = time_step
         self.step_skip = step_skip
         self.smoothing = smoothing
-        self.kbT = 8.617333262e-5*temperature/10 #eV/atom * 1/10 to convert A0^2/fs to cm^2/s
+        self.kbT = 8.617333262e-5*temperature * 10 #eV/atom * 10 to convert A0^2/fs to cm^2/s
         self.times = time_step*np.linspace(0, len(self.structures)*self.step_skip, int(len(self.structures)))
         self.index = []
         self.positions = []
@@ -46,8 +48,8 @@ class OnsagerTransportAnalyzer():
         self.diffusivity = {}
 
         for specie in self.species:
-            self.index.append(find_species(specie))
-            self.positions.append(prep_positions(self.index[-1]))
+            self.index.append(find_species(specie, self.structures))
+            self.positions.append(prep_positions(self.index[-1], self.structures))
 
         self.volume = self.structures[0].volume*1e-24 #convert to cm^3
         self.compute_L_tensor()
@@ -69,10 +71,7 @@ class OnsagerTransportAnalyzer():
         self.msd_map = dict()
         self.fit_dicts = np.zeros((len(self.species), len(self.species)), dtype=dict)
         self.fit_dicts_self = np.zeros((len(self.species), len(self.species)), dtype=dict)
-        #self.fit_errs = np.zeros((len(self.species), len(self.species)))
-        #self.fit_slope_errs = np.zeros((len(self.species), len(self.species)))
-        #self.fit_slope_errs_self = np.zeros((len(self.species), len(self.species)))
-        #self.fit_errs_self = np.zeros((len(self.species), len(self.species)))
+
         c = 0
         vals = list(self.mapping.values())
         for i in range(len(vals)):
@@ -80,11 +79,11 @@ class OnsagerTransportAnalyzer():
                 if i != j:
                     self.msds.append(self.compute_all_Lij_pairs(self.positions[i], self.positions[j], self.volume))
                     self.msd_map[(vals[i], vals[j])] = c
-                    self.L_tensor[j, j], self.fit_dicts[j, j] = fit_data(self.msds[-1][2], start_step, end_step, self.times, smoothing=self.smoothing)
-                    self.L_tensor[i, j], self.fit_dicts[i, j] = fit_data(self.msds[-1][4], start_step, end_step, self.times, smoothing=self.smoothing)
+                    self.L_tensor[j, j], self.fit_dicts[j, j] = fit_data(f=self.msds[-1][2], start=start_step, end=end_step, times=self.times, smoothing=self.smoothing)
+                    self.L_tensor[i, j], self.fit_dicts[i, j] = fit_data(f=self.msds[-1][4], start=start_step, end=end_step, times=self.times, smoothing=self.smoothing)
                     self.L_tensor[j, i] = self.L_tensor[i, j]
                     self.fit_dicts[j, i] = self.fit_dicts[i, j]
-                    self.L_tensor_self[j, j], self.fit_dicts_self[j, j] = fit_data(self.msds[-1][3], start_step, end_step, self.times, smoothing=self.smoothing)
+                    self.L_tensor_self[j, j], self.fit_dicts_self[j, j] = fit_data(f=self.msds[-1][3], start=start_step, end=end_step, times=self.times, smoothing=self.smoothing)
                     c+=1
         self.L_tensor_dis = self.L_tensor - self.L_tensor_self
 
@@ -169,7 +168,18 @@ class OnsagerTransportAnalyzer():
         self.L_tensor[j, i] = self.L_tensor[i, j]
         self.fit_dicts[j, i] = self.fit_dicts[i, j]
         self.L_tensor_dis = self.L_tensor - self.L_tensor_self
-    
+        
+    def compute_D_from_msd(self, specie: str, smoothed: bool = False):
+        """
+        Computes the diffusion coefficient from the mean squared displacement.
+        :param specie: str, species for which to compute the diffusion coefficient
+        :param smoothed: bool, whether to smooth the MSD data
+        :return D: float, diffusion coefficient
+        """
+        diff_analyzer = DiffusionAnalyzer.from_structures(self.structures, specie, self.temperature, self.time_step, self.step_skip, smoothed=smoothed)
+        return diff_analyzer.diffusivity, diff_analyzer.msd
+        
+    @classmethod
     def from_xdatcar(cls, xdatcar: Union[str, Xdatcar], temperature: float, species: list[str] = None, time_step : float = 2, step_skip : int = 1, smoothing : str = None):
         """
         Initialize the OnsagerTransport object from a VASP XDATCAR file.
@@ -185,6 +195,7 @@ class OnsagerTransportAnalyzer():
             xdatcar = Xdatcar(xdatcar)
         return cls(xdatcar.structures, temperature, species, time_step, step_skip, smoothing)
 
+    @classmethod
     def from_trajectory(cls, trajectory: Trajectory, temperature: float, species: list[str] = None, smoothing : str = None):
         """
         Initialize the OnsagerTransport object from a pymatgen Trajectory object.
@@ -197,6 +208,7 @@ class OnsagerTransportAnalyzer():
         structures = [trajectory.get_structure(i) for i in range(len(trajectory))]
         return cls(structures, temperature, species, trajectory.time_step, trajectory.step_skip, smoothing)
     
+    @classmethod
     def from_lammps_dump(cls, dump_file: str, temperature: float, species: list[str] = None, time_step : float = 2, step_skip : int = 1, smoothing : str = None):
         """
         Initialize the OnsagerTransport object from a LAMMPS dump file.

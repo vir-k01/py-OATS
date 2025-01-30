@@ -5,10 +5,11 @@ from pymatgen.entries.computed_entries import ComputedEntry, ComputedStructureEn
 import numpy as np
 import pandas as pd
 from typing import Union
-from ..utils.entries import get_entry, get_min_entry
+from ..utils.entries import get_min_entry
+import warnings
 
 
-def mu_distance(phases : list[Union[ComputedEntry, ComputedStructureEntry]], chempot : ChemicalPotentialDiagram = None, mode : str ='min'):
+def mu_distance(phases : list[Union[ComputedEntry | ComputedStructureEntry]], chempot : ChemicalPotentialDiagram = None, mode : str ='min'):
     '''
     Compute the distance between the chemical potentials of two phases in a ChemicalPotentialDiagram object.
     Parameters:
@@ -22,6 +23,9 @@ def mu_distance(phases : list[Union[ComputedEntry, ComputedStructureEntry]], che
     Note: 
     
     '''
+    if len(phases) != 2 or len(phases) > 2:
+        raise ValueError("Only works for binary (i.e., pairwise) reactions. Check back later for more complex reactions!")
+    
     if chempot is None:
         species = set()
         for phase in phases:
@@ -83,10 +87,11 @@ def get_fluxes_across_interface(interface : list[Union[ComputedStructureEntry, C
     if isinstance(interface[0], str):
         with MPRester() as mpr:
             entries = mpr.get_entries(interface)
-        interface = [get_min_entry(interface[0], entries), get_min_entry(interface[2], entries), get_min_entry(interface[2], entries)]
+        entry_set = GibbsEntrySet.from_entries(entries, temperature=temperature)
+        interface = [entry_set.get_min_entry_by_formula(interface[0]), entry_set.get_min_entry_by_formula(interface[1]), entry_set.get_min_entry_by_formula(interface[2])]
             
-            
-    mu = np.delete(mu_distance([interface[0], interface[2]], chempot, mode), 2)
+    #mu = np.delete(mu_distance([interface[0], interface[2]], chempot, mode), 2)
+    mu = mu_distance([interface[0], interface[2]], chempot, mode)
     
     if isinstance(L_data, pd.DataFrame):
         temps = L_data['Temperature'].unique()
@@ -109,6 +114,7 @@ def get_fluxes_across_interface(interface : list[Union[ComputedStructureEntry, C
         ]
         if L_ij_values[0][0].empty:
             #raise ValueError(f"No data found for {interface[1]} at {closest_temp}")
+            warnings.warn(f"No data found for {interface[1]} at {closest_temp}. Using default values.")
             L_ij_values = np.eye(3)*1e15
             L_ij_values_std = np.eye(3)*1e15
     
