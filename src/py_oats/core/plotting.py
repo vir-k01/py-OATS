@@ -64,7 +64,7 @@ def plot_correlation_pairwise(analyzer: OnsagerTransportAnalyzer, size=10):
     for i in range(len(analyzer.species)):
         for j in range(i, len(analyzer.species)):
             if i != j:
-                plot_msd(analyzer.msds[analyzer.msd_map[(i, j)]], labels=[analyzer.species[i], analyzer.species[j]], size=size)
+                plot_msd(analyzer, analyzer.msds[analyzer.msd_map[(i, j)]], labels=[analyzer.species[i], analyzer.species[j]], size=size)
 
 
 def plot_all_correlations(analyzer: OnsagerTransportAnalyzer, size=10):
@@ -80,7 +80,7 @@ def plot_all_correlations(analyzer: OnsagerTransportAnalyzer, size=10):
                 plt.plot(analyzer.times, analyzer.msds[analyzer.msd_map[(i, j)]][1], label=analyzer.species[i] + '-' + analyzer.species[i] + '_self')
                 plt.plot(analyzer.times, analyzer.msds[analyzer.msd_map[(i, j)]][0], label=analyzer.species[i] + '-' + analyzer.species[i] + '_net')
     plt.xlabel('Time (fs)')
-    plt.ylabel('MSD')
+    plt.ylabel('Correlation function')
     plt.title(analyzer.composition + ' at ' + str(analyzer.temperature) + ' K')
     plt.legend()
     plt.show()

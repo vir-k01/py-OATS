@@ -18,7 +18,14 @@ class OnsagerTransportAnalyzer():
     The order in which the transport coefficients can be accessed by calling the OnsagerFitting.species attribute.
     Smoothing can be specificed: 'blockavg' for block averaging, 'best_fit' for best fit, 'None' for no smoothing. The default is best_fit.
     '''
-    def __init__(self, structures: list[Structure], temperature: float, species: List[Union[str, Element]], time_step: float = 2, step_skip: int = 1, smoothing: str = None):
+    def __init__(self, 
+                 structures: list[Structure], 
+                 temperature: float, 
+                 species: List[Union[str, Element]], 
+                 time_step: float = 2, 
+                 step_skip: int = 1, 
+                 smoothing: str = None
+                 ):
         self.structures = structures
         self.mapping = dict()
         self.composition = self.structures[0].composition.reduced_formula
@@ -51,7 +58,7 @@ class OnsagerTransportAnalyzer():
             self.index.append(find_species(specie, self.structures))
             self.positions.append(prep_positions(self.index[-1], self.structures))
 
-        self.volume = self.structures[0].volume*1e-24 #convert to cm^3
+        self.volume = np.mean([s.volume for s in self.structures]) * 1e-24 #convert to cm^3
         self.compute_L_tensor()
     
     def compute_L_tensor(self, start_step: int = None, end_step: int = None):
@@ -75,7 +82,7 @@ class OnsagerTransportAnalyzer():
         c = 0
         vals = list(self.mapping.values())
         for i in range(len(vals)):
-            for j in range(i, len(vals)):
+            for j in range(len(vals)):
                 if i != j:
                     self.msds.append(self.compute_all_Lij_pairs(self.positions[i], self.positions[j], self.volume))
                     self.msd_map[(vals[i], vals[j])] = c
@@ -196,7 +203,12 @@ class OnsagerTransportAnalyzer():
         return cls(xdatcar.structures, temperature, species, time_step, step_skip, smoothing)
 
     @classmethod
-    def from_trajectory(cls, trajectory: Trajectory, temperature: float, species: list[str] = None, smoothing : str = None):
+    def from_trajectory(cls, 
+                        trajectory: Trajectory, 
+                        temperature: float, 
+                        species: list[str] = None, 
+                        smoothing : str = None
+                        ):
         """
         Initialize the OnsagerTransport object from a pymatgen Trajectory object.
         :param trajectory: Trajectory, pymatgen Trajectory object
@@ -209,7 +221,15 @@ class OnsagerTransportAnalyzer():
         return cls(structures, temperature, species, trajectory.time_step, trajectory.step_skip, smoothing)
     
     @classmethod
-    def from_lammps_dump(cls, dump_file: str, temperature: float, species: list[str] = None, time_step : float = 2, step_skip : int = 1, smoothing : str = None):
+    def from_lammps_dump(cls, 
+                         dump_file: str, 
+                         temperature: float, 
+                         species: list[str] = None, 
+                         time_step : float = 2, 
+                         step_skip : int = 1, 
+                         smoothing : str = None,
+                         skip_extra : int = 1
+                         ):
         """
         Initialize the OnsagerTransport object from a LAMMPS dump file.
         :param dump_file: str, path to LAMMPS dump file
@@ -220,12 +240,12 @@ class OnsagerTransportAnalyzer():
         :param smoothing: str, type of smoothing to apply to the data
         :return: OnsagerTransport object
         """
-        ase_trajectory = read(dump_file, format="lammps-dump-text")
-        structures = [AseAtomsAdaptor.get_structure(frame) for frame in ase_trajectory]
+        ase_trajectory = read(dump_file, format="lammps-dump-text", index=":")
+        structures = [AseAtomsAdaptor.get_structure(frame) for frame in ase_trajectory[::skip_extra]]
         if species:
-            if structures[0].compposition.species != species:  # if species are not in the structure, substitute them in the order passed into the function
+            if all(structures[0].composition.get_el_amt_dict().keys()) not in species:  # if species are not in the structure, substitute them in the order passed into the function
                 for id, frame in enumerate(structures):
-                    for specie, f_specie in zip(species, frame.composition.species):
+                    for specie, f_specie in zip(species, frame.composition.get_el_amt_dict().keys()):
                         structures[id][f_specie] = specie
         return cls(structures, temperature, species, time_step, step_skip, smoothing)
 

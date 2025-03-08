@@ -102,16 +102,10 @@ def get_fluxes_across_interface(interface : list[Union[ComputedStructureEntry, C
         formula_data =  L_data[(L_data['Formula'] == interface[1]) & (L_data['Temperature'] == closest_temp)]
     # Extract L_ij values
         
-        L_ij_values = [
-            [formula_data['L00'], formula_data['L01'], formula_data['L02']],
-            [formula_data['L01'], formula_data['L11'], formula_data['L12']],
-            [formula_data['L02'], formula_data['L12'], formula_data['L22']]
-        ]
-        L_ij_values_std = [
-            [formula_data['L00_std'], formula_data['L01_std'], formula_data['L02_std']],
-            [formula_data['L01_std'], formula_data['L11_std'], formula_data['L12_std']],
-            [formula_data['L02_std'], formula_data['L12_std'], formula_data['L22_std']]
-        ]
+        L_ij_values = [[formula_data[f'L{i}{j}'].values[0] for j in range(3)] for i in range(3)]
+
+        L_ij_values_std = [[formula_data[f'L{i}{j}_std'].values[0] for j in range(3)] for i in range(3)]
+
         if L_ij_values[0][0].empty:
             #raise ValueError(f"No data found for {interface[1]} at {closest_temp}")
             warnings.warn(f"No data found for {interface[1]} at {closest_temp}. Using default values.")
