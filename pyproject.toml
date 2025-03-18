@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "py_oats"
 version = "0.0.1"
 dependencies = [
-  "pymatgen,
+  "pymatgen",
   "pandas",
   "pymatgen-analysis-diffusion"
 ]
