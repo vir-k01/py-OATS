@@ -1,6 +1,8 @@
 from scipy.stats import linregress
 import numpy as np
 
+BIG = 1e6
+
 def fit_in_best_fit_interval(f: np.ndarray[float], times: np.ndarray[float], start: int = None, end: int = None):
     """
     Finds the best fit interval for a given "MSD" data set. 
@@ -12,8 +14,8 @@ def fit_in_best_fit_interval(f: np.ndarray[float], times: np.ndarray[float], sta
     :return best_fit_interval: int, time index at which to end fitting
     """
     best_fit_interval = 0
-    min_mae = 100000
-    int_len = int((end - start)/100)
+    min_mae = BIG
+    int_len = int((end - start)/20)
     
     scale = 1
     slope_tol = 0.5 # Tolerance for the slope of the linear regression, i.e., the slope of the best fit line must be within 0.5 of 1.
@@ -26,11 +28,8 @@ def fit_in_best_fit_interval(f: np.ndarray[float], times: np.ndarray[float], sta
             if mae < min_mae and np.abs(slope - 1) < slope_tol:
                 best_fit_interval = i
                 min_mae = mae
-                break
+                break # break out as soon as a "good" fit is found, else the interval might become too small and we end up fitting noise.
         scale *= 2
-
-    if min_mae == 100000:  # If no good fit is found, return the entire interval as the best fit, since this is the best we can do.
-        return start, end, min_mae
     
     slope, intercept, r_value, p_value, std_err = linregress(times[start:end], f[start:end])
     
@@ -51,10 +50,12 @@ def fit_with_blockavg(f: np.ndarray[float], times: np.ndarray[float] = None, sta
         block_averages: array-like, block-averaged MSD values.
     """
     
-    f = f[start:end]
+    skip_initial = (end - start) // 20
+    f = f[start + skip_initial : end - skip_initial]
     scale = 20
     block_lengths = np.arange(1, len(f)//2, len(f)//scale)
-    min_mae = 100000
+    min_mae = BIG
+    fit_dict = {'fit_err': min_mae, 'slope_err': min_mae, 'block_length': 1}
 
     for i, block_length in enumerate(block_lengths):
         num_blocks = len(f) // block_length
@@ -62,19 +63,17 @@ def fit_with_blockavg(f: np.ndarray[float], times: np.ndarray[float] = None, sta
         time_averages = np.zeros(num_blocks)
         
         for i in range(num_blocks):
-            block_averages.append(np.mean(f[i * block_length : (i + 1) * block_length]))
-            time_averages.append(np.mean(times[i * block_length : (i + 1) * block_length]))
+            block_averages[i] = np.mean(f[i * block_length : (i + 1) * block_length])
+            time_averages[i] = np.mean(times[i * block_length : (i + 1) * block_length])
         
         slope, intercept, r_value, p_value, std_err = linregress(np.log(time_averages), np.log(block_averages))
         if np.abs(slope - 1) < min_mae:
             slope, intercept, r_value, p_value, std_err = linregress(time_averages, block_averages)
             min_mae = np.abs(slope - 1)
-            break
+            fit_dict['block_length'] = block_length
+            fit_dict['fit_err'] = std_err
+            fit_dict['slope_err'] = min_mae
     
-    if min_mae == 100000:
-        slope, intercept, r_value, p_value, std_err = linregress(times[start:end], f[start:end])
-    
-    fit_dict = {'fit_err': std_err, 'slope_err': min_mae, 'block_length': block_length}
     return slope, fit_dict
 
 def fit_data(f: np.ndarray[float], times: np.ndarray[float], start: int = None, end: int = None, smoothing: str = 'best_fit'):
