@@ -2,13 +2,13 @@ import numpy as np
 from pymatgen.core import Structure, Element
 
 
-def find_species(symbol: str, structures: list[Structure]):
+def find_species(symbol: str, structure: Structure):
     """
     Finds the indices of atoms of a given species in the structure.
     :param symbol: str, chemical symbol of species
     :return: ind: list[int], indices of atoms of given species
     """
-    ind = [i for i in range(len(structures[0])) if structures[0].sites[i].species.elements[0].symbol == symbol]
+    ind = [i for i in range(len(structure)) if structure.sites[i].species.elements[0].symbol == symbol]
     return ind
 
 def prep_positions(ind: list[int], structures: list[Structure], correct_pbc: bool = True, com_frame: bool = False):
@@ -19,27 +19,25 @@ def prep_positions(ind: list[int], structures: list[Structure], correct_pbc: boo
     Indices correspond to time, ion index, and spatial dimension (x,y,z), respectively
     """
     T = len(structures)
-    dpositions = np.zeros((T, len(ind), 3))
-    positions = np.zeros((T, len(ind), 3))
-    com = np.zeros((T, 3))
-    mtot = 0
-    for i in range(0, T):
-        for j in range(len(structures[i])):
-            com[i, :] += structures[i].sites[j].coords*structures[i].sites[j].species.elements[0].atomic_mass
-            mtot += structures[i].sites[j].species.elements[0].atomic_mass
+    num_ind = len(ind)
+    
+    positions = np.zeros((T, num_ind, 3))
+    frac_coords = np.array([[structure.sites[ind[j]].frac_coords for j in range(num_ind)] for structure in structures])
     
     if correct_pbc:
-        for i in range(1, T):
-            for j in range(len(ind)):
-                dpositions[i, j, :] = structures[i].sites[ind[j]].frac_coords - structures[i-1].sites[ind[j]].frac_coords
-                if np.any(dpositions[i, j, :] > 0.5):
-                    dims = np.argwhere(dpositions[i, j, :] > 0.5)
-                    dpositions[i, j, dims] = dpositions[i, j, dims] - 1
-                if np.any(dpositions[i, j, :] < -0.5):
-                    dims = np.argwhere(dpositions[i, j, :] < -0.5)
-                    dpositions[i, j, dims] = dpositions[i, j, dims] + 1
-                positions[i, j, :] = positions[i-1, j, :] + dpositions[i, j, :]
-                if com_frame:
-                    positions[i, j, :] = positions[i, j, :] - com[i, :]/mtot
+        dfrac_coords = frac_coords[1:, :, :] - frac_coords[:-1, :, :]
+        dfrac_coords = np.where(dfrac_coords > 0.5, dfrac_coords - 1, dfrac_coords)
+        dfrac_coords = np.where(dfrac_coords < -0.5, dfrac_coords + 1, dfrac_coords)
 
-    return positions*structures[0].lattice.abc
+    # Accumulate positions
+    positions[1:, :, :] = np.cumsum(dfrac_coords, axis=0)
+        
+    if com_frame:
+        masses = np.array([[site.species.elements[0].atomic_mass for site in structure.sites] for structure in structures])
+        coords = np.array([[site.coords for site in structure.sites] for structure in structures])
+        com = np.einsum('ijk,ij->ik', coords, masses) / np.sum(masses)
+        positions -= com[:, np.newaxis, :] / np.sum(masses)
+            
+    final_positions = positions * structures[0].lattice.abc
+
+    return final_positions

@@ -27,13 +27,14 @@ class OnsagerTransportAnalyzer():
                  smoothing: str = None
                  ):
         self.structures = structures
+        self.first_structure = structures[0].copy()
         self.mapping = dict()
-        self.composition = self.structures[0].composition.reduced_formula
+        self.composition = self.first_structure.composition.reduced_formula
         if species:
             self.species = species
         else:
             self.species = set()
-            for s in self.structures[0].species:
+            for s in self.first_structure.species:
                 self.species.add(s.symbol)
             self.species = list(self.species)
         
@@ -55,7 +56,7 @@ class OnsagerTransportAnalyzer():
         self.diffusivity = {}
 
         for specie in self.species:
-            self.index.append(find_species(specie, self.structures))
+            self.index.append(find_species(specie, self.first_structure))
             self.positions.append(prep_positions(self.index[-1], self.structures))
 
         self.volume = np.mean([s.volume for s in self.structures]) * 1e-24 #convert to cm^3
@@ -240,8 +241,8 @@ class OnsagerTransportAnalyzer():
         :param smoothing: str, type of smoothing to apply to the data
         :return: OnsagerTransport object
         """
-        ase_trajectory = read(dump_file, format="lammps-dump-text", index=":")
-        structures = [AseAtomsAdaptor.get_structure(frame) for frame in ase_trajectory[::skip_extra]]
+        ase_trajectory = read(dump_file, format="lammps-dump-text", index=f"::{skip_extra}")
+        structures = [AseAtomsAdaptor.get_structure(frame) for frame in ase_trajectory]
         if species:
             if all(structures[0].composition.get_el_amt_dict().keys()) not in species:  # if species are not in the structure, substitute them in the order passed into the function
                 for id, frame in enumerate(structures):
