@@ -43,7 +43,7 @@ class OnsagerTransportAnalyzer():
         self.temperature = temperature
         self.time_step = time_step
         self.step_skip = step_skip
-        self.smoothing = smoothing
+        self.smoothing = smoothing if smoothing else 'best_fit'
         self.kbT = 8.617333262e-5*temperature * 10 #eV/atom * 10 to convert A0^2/fs to cm^2/s
         self.times = time_step*np.linspace(0, len(self.structures)*self.step_skip, int(len(self.structures)))
         self.index = []
