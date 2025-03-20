@@ -82,18 +82,26 @@ class OnsagerTransportAnalyzer():
 
         c = 0
         vals = list(self.mapping.values())
-        for i in range(len(vals)):
-            for j in range(len(vals)):
-                if i != j:
-                    self.msds.append(self.compute_all_Lij_pairs(self.positions[i], self.positions[j], self.volume))
-                    self.msd_map[(vals[i], vals[j])] = c
-                    self.L_tensor[j, j], self.fit_dicts[j, j] = fit_data(f=self.msds[-1][2], start=start_step, end=end_step, times=self.times, smoothing=self.smoothing)
-                    self.L_tensor[i, j], self.fit_dicts[i, j] = fit_data(f=self.msds[-1][4], start=start_step, end=end_step, times=self.times, smoothing=self.smoothing)
-                    self.L_tensor[j, i] = self.L_tensor[i, j]
-                    self.fit_dicts[j, i] = self.fit_dicts[i, j]
-                    self.L_tensor_self[j, j], self.fit_dicts_self[j, j] = fit_data(f=self.msds[-1][3], start=start_step, end=end_step, times=self.times, smoothing=self.smoothing)
-                    c+=1
-        self.L_tensor_dis = self.L_tensor - self.L_tensor_self
+        
+        if len(vals) == 1:
+            self.msds.append(self.compute_all_Lij_pairs(self.positions[0], self.positions[0], self.volume))
+            self.L_tensor[0, 0], self.fit_dicts[0, 0] = fit_data(f=self.msds[-1][2], start=start_step, end=end_step, times=self.times, smoothing=self.smoothing)
+            self.L_tensor_self[0, 0], self.fit_dicts_self[0, 0] = fit_data(f=self.msds[-1][3], start=start_step, end=end_step, times=self.times, smoothing=self.smoothing)
+            self.L_tensor_dis[0, 0] = self.L_tensor[0, 0] - self.L_tensor_self[0, 0]
+        
+        else:
+            for i in range(len(vals)):
+                for j in range(len(vals)):
+                    if i != j:
+                        self.msds.append(self.compute_all_Lij_pairs(self.positions[i], self.positions[j], self.volume))
+                        self.msd_map[(vals[i], vals[j])] = c
+                        self.L_tensor[j, j], self.fit_dicts[j, j] = fit_data(f=self.msds[-1][2], start=start_step, end=end_step, times=self.times, smoothing=self.smoothing)
+                        self.L_tensor[i, j], self.fit_dicts[i, j] = fit_data(f=self.msds[-1][4], start=start_step, end=end_step, times=self.times, smoothing=self.smoothing)
+                        self.L_tensor[j, i] = self.L_tensor[i, j]
+                        self.fit_dicts[j, i] = self.fit_dicts[i, j]
+                        self.L_tensor_self[j, j], self.fit_dicts_self[j, j] = fit_data(f=self.msds[-1][3], start=start_step, end=end_step, times=self.times, smoothing=self.smoothing)
+                        c+=1
+            self.L_tensor_dis = self.L_tensor - self.L_tensor_self
 
     def calc_Lii_self(self, atom_positions):
         """ 
