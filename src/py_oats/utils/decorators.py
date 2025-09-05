@@ -1,0 +1,102 @@
+from pymatgen.core import Structure, Species
+from typing import Dict, List, Union
+import numpy as np
+from pymatgen.analysis.bond_valence import BVAnalyzer
+from pymatgen.util.typing import PathLike
+from chgnet.model import CHGNetCalculator
+from pymatgen.io.ase import AseAtomsAdaptor
+from .charge import get_oxi_state_from_magmom, _initial_boundaries, get_specie_with_multiple_ox_states
+
+class ChargeDecorator():
+    def __init__(self,
+                 oxidation_states: Dict[str, List[int]]):
+        """
+        Args:
+            structure: pymatgen Structure object
+            oxidation_states: Dictionary mapping element symbols to lists of oxidation states.
+                            e.g., {"Li": [1], "Ti": [2, 4], "O": [-2]}
+        """
+        self.oxidation_states = oxidation_states
+    
+    def decorate_structure(self, structure: Structure) -> Structure:
+        pass
+
+class NaiveChargeDecorator(ChargeDecorator):
+    """
+    Naive charge decorator that assigns oxidation states to each site in the structure.
+    """
+    def decorate_structure(self, structure: Structure) -> Structure:
+        single_oxidation_states = {k: np.mean(v) for k, v in self.oxidation_states.items()}
+        return structure.add_oxidation_state_by_element(single_oxidation_states)
+
+class BVChargeDecorator(ChargeDecorator):
+    """
+    Decorates a pymatgen Structure object with oxidation states using bond valence analysis.
+    """
+    def decorate_structure(self, structure: Structure) -> Structure:
+        """
+        Decorates a pymatgen Structure object with oxidation states.
+        
+        Returns:
+            Structure: New structure with Species objects containing oxidation states
+        """
+        bv_analyzer = BVAnalyzer()
+        bv_structure = bv_analyzer.get_oxi_state_decorated_structure(structure)
+        return bv_structure
+
+
+class CHGNetChargeDecorator(ChargeDecorator):
+    """
+    Decorates a pymatgen Structure object with oxidation states using CHGNet. 
+    If no model path is provided, pretrained CHGnet will be used.
+    """
+    
+    def __init__(self, model_path: str | PathLike | None = None, oxidation_states: Dict[str, List[int]] = None):
+        super().__init__(oxidation_states)
+        self.model_path = model_path
+        if model_path:
+            self.model = CHGNetCalculator.from_file(self.model_path)
+        else:
+            self.model = CHGNetCalculator()
+    
+    def decorate_structure(self, structure: Structure) -> Structure:
+        # Check if structure already has magnetic moments
+        if structure.site_properties.get('magmoms', None) is not None:
+            # Use existing magnetic moments
+            magmoms = structure.site_properties['magmoms']
+            possible_species = get_specie_with_multiple_ox_states(self.oxidation_states)
+            oxi_states = []
+            
+            # Initialize with default oxidation states
+            for site in structure:
+                oxi_states.append(self.oxidation_states.get(site.specie.symbol)[0])
+            
+            # Update oxidation states based on magnetic moments for species with multiple states
+            for specie in possible_species:
+                species_mask = [s.symbol == specie for s in structure.species]
+                magmoms_species = [magmoms[i] for i, mask in enumerate(species_mask) if mask]
+                species_indices = [i for i, mask in enumerate(species_mask) if mask]
+                for idx, magmom in zip(species_indices, magmoms_species):
+                    oxi_states[idx] = get_oxi_state_from_magmom(magmom, specie, _initial_boundaries)
+            
+            structure.add_oxidation_state_by_site(oxi_states)
+        else:
+            # Use CHGNet to get magnetic moments
+            ase_atoms = AseAtomsAdaptor().get_atoms(structure)
+            ase_atoms.calc = self.model
+            possible_species = get_specie_with_multiple_ox_states(self.oxidation_states)
+            magmoms = ase_atoms.get_magnetic_moments()
+            oxi_states = []
+            for site in structure:
+                oxi_states.append(self.oxidation_states.get(site.specie.symbol)[0])
+
+            for specie in possible_species:
+                species_mask = [s == specie for s in ase_atoms.get_chemical_symbols()]
+                magmoms_species = magmoms[species_mask]
+                species_indices = [i for i, mask in enumerate(species_mask) if mask]
+                for idx, magmom in zip(species_indices, magmoms_species):
+                    oxi_states[idx] = get_oxi_state_from_magmom(magmom, specie, _initial_boundaries)
+            
+            structure.add_oxidation_state_by_site(oxi_states)
+        return structure
+

@@ -15,12 +15,12 @@ def fit_in_best_fit_interval(f: np.ndarray[float], times: np.ndarray[float], sta
     """
     best_fit_interval = 0
     min_mae = BIG
-    int_len = int((end - start)/20)
+    int_len = max(2, int((end - start)/20))  # Ensure at least 2 intervals
     
     scale = 1
     slope_tol = 0.5 # Tolerance for the slope of the linear regression, i.e., the slope of the best fit line must be within 0.5 of 1.
     
-    while scale < 10: # Downscale the interval length by powers of 2 to find the best fit interval. Anything more than 10 (1/10000th trajectory length) will be likely to be too small an interval to be useful.
+    while scale < 10 and int_len > 1: # Downscale the interval length by powers of 2 to find the best fit interval. Anything more than 10 (1/10000th trajectory length) will be likely to be too small an interval to be useful.
         intervals = np.linspace(start, end, int_len, dtype=int)
         for i in range(len(intervals)-1):
             slope, intercept, r_value, p_value, std_err = linregress(np.log(times[intervals[i]: intervals[i+1]]), np.log(f[intervals[i]:intervals[i+1]]))
@@ -30,10 +30,17 @@ def fit_in_best_fit_interval(f: np.ndarray[float], times: np.ndarray[float], sta
                 min_mae = mae
                 break # break out as soon as a "good" fit is found, else the interval might become too small and we end up fitting noise.
         scale *= 2
+        int_len = max(2, int((end - start)/(20 * scale)))  # Ensure at least 2 intervals
     
     slope, intercept, r_value, p_value, std_err = linregress(times[start:end], f[start:end])
     
-    fit_dict = {'fit_err': std_err, 'slope_err': min_mae, 'interval': [intervals[best_fit_interval], intervals[best_fit_interval+1]]}
+    # Ensure best_fit_interval is within bounds
+    if int_len > 1:
+        intervals = np.linspace(start, end, int_len, dtype=int)
+        best_fit_interval = min(best_fit_interval, len(intervals) - 2)  # Ensure we can access intervals[best_fit_interval+1]
+        fit_dict = {'fit_err': std_err, 'slope_err': min_mae, 'interval': [intervals[best_fit_interval], intervals[best_fit_interval+1]]}
+    else:
+        fit_dict = {'fit_err': std_err, 'slope_err': min_mae, 'interval': [start, end]}
     
     return slope, fit_dict
 
