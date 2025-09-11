@@ -11,7 +11,8 @@ from ..utils.FFT import msd_fft, msd_fft_cross
 from ..utils.fitting import fit_data
 from ..utils.site_processing import find_species, prep_positions
 from ..utils.decorators import ChargeDecorator, NaiveChargeDecorator
-from ..utils.charge import get_unique_charged_species, get_oxi_state_from_magmom
+from ..utils.charge import get_unique_charged_species
+from ..utils.oxidation import assign_oxidation_states_by_magmoms
 
 class OnsagerTransportAnalyzer():
     '''
@@ -42,31 +43,27 @@ class OnsagerTransportAnalyzer():
         
         # Handle oxidation states if provided
         if oxidation_states:
+            # Make accessible early for downstream use
+            self.oxidation_states = oxidation_states
             # Check if structures have magnetic moments
             has_magmoms = any(s.site_properties.get('final_magmom', None) is not None for s in self.structures) | any(s.site_properties.get('magmoms', None) is not None for s in self.structures)
             
             if has_magmoms:
                 # Use magnetic moments to determine oxidation states
                 print('Using magnetic moments to determine oxidation states')
-                from ..utils.charge import _initial_boundaries
+                from ..utils.charge import _initial_boundaries   
                 possible_species = [elem for elem, states in oxidation_states.items() if len(states) > 1]
                 
                 self.decorated_structures = []
                 for structure in self.structures:
                     magmoms = structure.site_properties['final_magmom'] if structure.site_properties.get('final_magmom', None) is not None else structure.site_properties['magmoms']
-                    oxi_states = []
-                    
-                    # Initialize with default oxidation states
-                    for site in structure:
-                        oxi_states.append(oxidation_states.get(site.specie.symbol)[0])
-                    
-                    # Update oxidation states based on magnetic moments for species with multiple states
-                    for specie in possible_species:
-                        species_mask = [s.symbol == specie for s in structure.species]
-                        magmoms_species = [magmoms[i] for i, mask in enumerate(species_mask) if mask]
-                        species_indices = [i for i, mask in enumerate(species_mask) if mask]
-                        for idx, magmom in zip(species_indices, magmoms_species):
-                            oxi_states[idx] = get_oxi_state_from_magmom(magmom, specie, _initial_boundaries)
+                    oxi_states = assign_oxidation_states_by_magmoms(
+                        structure=structure,
+                        oxidation_states=self.oxidation_states,
+                        magmoms=magmoms,
+                        adaptive_boundaries=True,
+                        bounds=_initial_boundaries,
+                    )
                     
                     decorated_structure = structure.add_oxidation_state_by_site(oxi_states)
                     self.decorated_structures.append(decorated_structure)
@@ -87,7 +84,6 @@ class OnsagerTransportAnalyzer():
             
             # Get unique charged species from oxidation states
             self.species = get_unique_charged_species(oxidation_states)
-            self.oxidation_states = oxidation_states
             print("Got the decorated structures!")
         else:
             # Original behavior without oxidation states

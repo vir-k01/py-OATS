@@ -5,7 +5,8 @@ from pymatgen.analysis.bond_valence import BVAnalyzer
 from pymatgen.util.typing import PathLike
 from chgnet.model import CHGNetCalculator
 from pymatgen.io.ase import AseAtomsAdaptor
-from .charge import get_oxi_state_from_magmom, _initial_boundaries, get_specie_with_multiple_ox_states
+from .charge import _initial_boundaries, get_specie_with_multiple_ox_states
+from .oxidation import assign_oxidation_states_by_magmoms
 
 class ChargeDecorator():
     def __init__(self,
@@ -51,9 +52,12 @@ class CHGNetChargeDecorator(ChargeDecorator):
     If no model path is provided, pretrained CHGnet will be used.
     """
     
-    def __init__(self, model_path: str | PathLike | None = None, oxidation_states: Dict[str, List[int]] = None):
+    def __init__(self, model_path: str | PathLike | None = None, 
+                 oxidation_states: Dict[str, List[int]] = None,
+                 adaptive_boundaries: bool = False):
         super().__init__(oxidation_states)
         self.model_path = model_path
+        self.adaptive_boundaries = adaptive_boundaries
         if model_path:
             self.model = CHGNetCalculator.from_file(self.model_path)
         else:
@@ -62,41 +66,27 @@ class CHGNetChargeDecorator(ChargeDecorator):
     def decorate_structure(self, structure: Structure) -> Structure:
         # Check if structure already has magnetic moments
         if structure.site_properties.get('magmoms', None) is not None:
-            # Use existing magnetic moments
             magmoms = structure.site_properties['magmoms']
-            possible_species = get_specie_with_multiple_ox_states(self.oxidation_states)
-            oxi_states = []
-            
-            # Initialize with default oxidation states
-            for site in structure:
-                oxi_states.append(self.oxidation_states.get(site.specie.symbol)[0])
-            
-            # Update oxidation states based on magnetic moments for species with multiple states
-            for specie in possible_species:
-                species_mask = [s.symbol == specie for s in structure.species]
-                magmoms_species = [magmoms[i] for i, mask in enumerate(species_mask) if mask]
-                species_indices = [i for i, mask in enumerate(species_mask) if mask]
-                for idx, magmom in zip(species_indices, magmoms_species):
-                    oxi_states[idx] = get_oxi_state_from_magmom(magmom, specie, _initial_boundaries)
-            
+            oxi_states = assign_oxidation_states_by_magmoms(
+                structure=structure,
+                oxidation_states=self.oxidation_states,
+                magmoms=magmoms,
+                adaptive_boundaries=self.adaptive_boundaries,
+                bounds=_initial_boundaries,
+            )
             structure.add_oxidation_state_by_site(oxi_states)
         else:
             # Use CHGNet to get magnetic moments
             ase_atoms = AseAtomsAdaptor().get_atoms(structure)
             ase_atoms.calc = self.model
-            possible_species = get_specie_with_multiple_ox_states(self.oxidation_states)
             magmoms = ase_atoms.get_magnetic_moments()
-            oxi_states = []
-            for site in structure:
-                oxi_states.append(self.oxidation_states.get(site.specie.symbol)[0])
-
-            for specie in possible_species:
-                species_mask = [s == specie for s in ase_atoms.get_chemical_symbols()]
-                magmoms_species = magmoms[species_mask]
-                species_indices = [i for i, mask in enumerate(species_mask) if mask]
-                for idx, magmom in zip(species_indices, magmoms_species):
-                    oxi_states[idx] = get_oxi_state_from_magmom(magmom, specie, _initial_boundaries)
-            
+            oxi_states = assign_oxidation_states_by_magmoms(
+                structure=structure,
+                oxidation_states=self.oxidation_states,
+                magmoms=magmoms,
+                adaptive_boundaries=self.adaptive_boundaries,
+                bounds=_initial_boundaries,
+            )
             structure.add_oxidation_state_by_site(oxi_states)
         return structure
 

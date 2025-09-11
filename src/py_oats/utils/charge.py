@@ -1,5 +1,7 @@
 from typing import Dict, List
 import numpy as np
+from pymatgen.core import Structure
+
 
 _initial_boundaries = {"Mn" : {4 : 3.08,
                                    3 : 4.2,
@@ -41,22 +43,3 @@ def get_specie_with_multiple_ox_states(oxidation_states: Dict[str, List[int]]) -
         if len(ox_states) > 1:
             specie_with_multiple_ox_states.append(element)
     return specie_with_multiple_ox_states
-
-def get_oxi_state_from_magmom(magmom: float, element: str, bounds: dict) -> int:
-    """
-    Get the oxidation state from the magnetic moment.
-    Higher oxidation states have lower magnetic moments.
-    """
-    
-    bounds = list(bounds[element].items())
-    # Sort by magnetic moment value (ascending)
-    bounds.sort(key=lambda x: x[1])
-    
-    # For magnetic moments, higher oxidation states have lower moments
-    # So we check from highest to lowest oxidation state
-    for oxi_state, bound in (bounds):
-        if magmom <= bound:
-            return oxi_state
-    
-    # If no match found, return the lowest oxidation state
-    return bounds[0][0]
