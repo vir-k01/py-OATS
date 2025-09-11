@@ -15,7 +15,7 @@ def fit_in_best_fit_interval(f: np.ndarray[float], times: np.ndarray[float], sta
     """
     best_fit_interval = 0
     min_mae = BIG
-    int_len = max(2, int((end - start)/20))  # Ensure at least 2 intervals
+    int_len = max(2, int((end - start)/10))  # Ensure at least 2 intervals
     
     scale = 1
     slope_tol = 0.5 # Tolerance for the slope of the linear regression, i.e., the slope of the best fit line must be within 0.5 of 1.
