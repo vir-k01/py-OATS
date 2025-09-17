@@ -54,7 +54,7 @@ class CHGNetChargeDecorator(ChargeDecorator):
     
     def __init__(self, model_path: str | PathLike | None = None, 
                  oxidation_states: Dict[str, List[int]] = None,
-                 adaptive_boundaries: bool = False):
+                 adaptive_boundaries: bool = True):
         super().__init__(oxidation_states)
         self.model_path = model_path
         self.adaptive_boundaries = adaptive_boundaries
