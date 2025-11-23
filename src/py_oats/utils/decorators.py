@@ -1,5 +1,5 @@
 from pymatgen.core import Structure, Species
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Any
 import numpy as np
 from pymatgen.analysis.bond_valence import BVAnalyzer
 from pymatgen.util.typing import PathLike
@@ -34,6 +34,13 @@ class BVChargeDecorator(ChargeDecorator):
     """
     Decorates a pymatgen Structure object with oxidation states using bond valence analysis.
     """
+    def __init__(self, 
+                 oxidation_states: Dict[str, List[int]],
+                 bv_kwargs: Dict[str, Any] = {},
+                 ):
+        super().__init__(oxidation_states)
+        self.bv_analyzer = BVAnalyzer(**bv_kwargs)
+    
     def decorate_structure(self, structure: Structure) -> Structure:
         """
         Decorates a pymatgen Structure object with oxidation states.
@@ -41,8 +48,7 @@ class BVChargeDecorator(ChargeDecorator):
         Returns:
             Structure: New structure with Species objects containing oxidation states
         """
-        bv_analyzer = BVAnalyzer()
-        bv_structure = bv_analyzer.get_oxi_state_decorated_structure(structure)
+        bv_structure = self.bv_analyzer.get_oxi_state_decorated_structure(structure)
         return bv_structure
 
 
