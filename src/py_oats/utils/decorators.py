@@ -3,7 +3,7 @@ from typing import Dict, List, Union, Any
 import numpy as np
 from pymatgen.analysis.bond_valence import BVAnalyzer
 from pymatgen.util.typing import PathLike
-from chgnet.model import CHGNetCalculator
+from chgnet.model import CHGNetCalculator, CHGNet
 from pymatgen.io.ase import AseAtomsAdaptor
 from .charge import _initial_boundaries, get_specie_with_multiple_ox_states
 from .oxidation import assign_oxidation_states_by_magmoms
@@ -67,7 +67,8 @@ class CHGNetChargeDecorator(ChargeDecorator):
         if model_path:
             self.model = CHGNetCalculator.from_file(self.model_path)
         else:
-            self.model = CHGNetCalculator()
+            model = CHGNet(model_name="r2scan")
+            self.model = CHGNetCalculator(model=model)
     
     def decorate_structure(self, structure: Structure) -> Structure:
         # Check if structure already has magnetic moments
