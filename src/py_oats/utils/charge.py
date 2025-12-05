@@ -43,3 +43,24 @@ def get_specie_with_multiple_ox_states(oxidation_states: Dict[str, List[int]]) -
         if len(ox_states) > 1:
             specie_with_multiple_ox_states.append(element)
     return specie_with_multiple_ox_states
+
+def interpolate_decorated_structures(decorated_structures: List[Structure], all_structures: List[Structure]) -> List[Structure]:
+    """
+    Interpolate the decorated structures to the length of the all structures.
+    """
+    step_skip = len(all_structures) // len(decorated_structures)
+    interpolated_structures = []
+    oxi_states = None 
+    for i, structure in enumerate(all_structures[:-1]):
+        if i % step_skip == 0:
+            try:
+                oxi_states = [site.specie._oxi_state for site in decorated_structures[i // step_skip]]
+            except IndexError:
+                oxi_states = [site.specie._oxi_state for site in decorated_structures[-1]]
+        if oxi_states is not None:
+            interpolated_structures.append(structure.add_oxidation_state_by_site(oxi_states).copy())
+        else:
+            oxi_states = [site.specie._oxi_state for site in decorated_structures[0]]
+            interpolated_structures.append(structure.add_oxidation_state_by_site(oxi_states).copy())
+    return interpolated_structures
+    

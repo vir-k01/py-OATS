@@ -1,4 +1,4 @@
-from pymatgen.core import Structure, Element, Species
+from pymatgen.core import Structure, Element, Species, Lattice
 from pymatgen.core.trajectory import Trajectory
 from pymatgen.io.vasp import Xdatcar
 from ase.io import read
@@ -11,10 +11,10 @@ from ..utils.FFT import msd_fft, msd_fft_cross
 from ..utils.fitting import fit_data
 from ..utils.site_processing import find_species, prep_positions
 from ..utils.decorators import ChargeDecorator, NaiveChargeDecorator
-from ..utils.charge import get_unique_charged_species
+from ..utils.charge import get_unique_charged_species, interpolate_decorated_structures
 from ..utils.oxidation import assign_oxidation_states_by_magmoms
 
-class OnsagerTransportAnalyzer():
+class OnsagerTransportAnalyzer:
     '''
     Class to fit the transport coefficients to the Onsager relations. Based on repo by Kara Fong (@kdfong).
     Provide a list of pymatgen structure taken from an NVT MD run, alongwith simulation temperature and species to fit the transport coefficients.
@@ -34,19 +34,24 @@ class OnsagerTransportAnalyzer():
                  time_step: float = 2, 
                  step_skip: int = 1, 
                  decorate_freq : int = -1,
-                 smoothing: str = None
+                 smoothing: str = None,
+                 **kwargs
                  ):
-        self.structures = structures
+        
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+            
         self.first_structure = structures[0].copy()
         self.mapping, self.inv_mapping = dict(), dict()
         self.composition = self.first_structure.composition.reduced_formula
+        self.traj_length = len(structures)
         
         # Handle oxidation states if provided
-        if oxidation_states:
+        if oxidation_states or charge_decorator:
             # Make accessible early for downstream use
-            self.oxidation_states = oxidation_states
+            self.oxidation_states = oxidation_states if oxidation_states else charge_decorator.oxidation_states
             # Check if structures have magnetic moments
-            has_magmoms = any(s.site_properties.get('final_magmom', None) is not None for s in self.structures) | any(s.site_properties.get('magmoms', None) is not None for s in self.structures)
+            has_magmoms = any(s.site_properties.get('final_magmom', None) is not None for s in structures) | any(s.site_properties.get('magmoms', None) is not None for s in structures)
             
             if has_magmoms:
                 # Use magnetic moments to determine oxidation states
@@ -54,8 +59,8 @@ class OnsagerTransportAnalyzer():
                 from ..utils.charge import _initial_boundaries   
                 possible_species = [elem for elem, states in oxidation_states.items() if len(states) > 1]
                 
-                self.decorated_structures = []
-                for structure in self.structures:
+                decorated_structures = []
+                for structure in structures:
                     magmoms = structure.site_properties['final_magmom'] if structure.site_properties.get('final_magmom', None) is not None else structure.site_properties['magmoms']
                     oxi_states = assign_oxidation_states_by_magmoms(
                         structure=structure,
@@ -66,7 +71,7 @@ class OnsagerTransportAnalyzer():
                     )
                     
                     decorated_structure = structure.add_oxidation_state_by_site(oxi_states)
-                    self.decorated_structures.append(decorated_structure)
+                    decorated_structures.append(decorated_structure)
             else:
                 # Decorate all structures with oxidation states obtained from charge decorator
                 if not charge_decorator:
@@ -74,20 +79,26 @@ class OnsagerTransportAnalyzer():
                 else:
                     charge_decorator.oxidation_states = oxidation_states
                 if decorate_freq > 0:
-                    self.decorated_structures = [charge_decorator.decorate_structure(s) for s in self.structures]
+                    sub_decorated_structures = [charge_decorator.decorate_structure(s) for s in structures[::decorate_freq]]
+                    # interpolate the decorated structures to the length of the trajectory
+                    decorated_structures = interpolate_decorated_structures(sub_decorated_structures, structures)
+                elif decorate_freq == 0:
+                    first_structure = charge_decorator.decorate_structure(structures[0])
+                    predicted_oxidation_states = [site.specie.oxi_state for site in first_structure]
+                    decorated_structures = [s.add_oxidation_state_by_site(predicted_oxidation_states) for s in structures]
                 else:
-                    last_structure = charge_decorator.decorate_structure(self.structures[-1])
+                    last_structure = charge_decorator.decorate_structure(structures[-1])
                     predicted_oxidation_states = [site.specie.oxi_state for site in last_structure]
-                    self.decorated_structures = [s.add_oxidation_state_by_site(predicted_oxidation_states) for s in self.structures]
+                    decorated_structures = [s.add_oxidation_state_by_site(predicted_oxidation_states) for s in structures]
             
-            self.first_structure = self.decorated_structures[0].copy()
+            self.first_structure = decorated_structures[0].copy()
             
             # Get unique charged species from oxidation states
             self.species = get_unique_charged_species(oxidation_states)
             print("Got the decorated structures!")
         else:
             # Original behavior without oxidation states
-            self.decorated_structures = self.structures
+            decorated_structures = structures
             if species:
                 self.species = species
             else:
@@ -106,7 +117,7 @@ class OnsagerTransportAnalyzer():
         self.step_skip = step_skip
         self.smoothing = smoothing if smoothing else 'best_fit'
         self.kbT = 8.617333262e-5*temperature * 10 #eV/atom * 10 to convert A0^2/fs to cm^2/s
-        self.times = time_step*np.linspace(0, len(self.structures)*self.step_skip, int(len(self.structures)))
+        self.times = time_step*np.linspace(0, self.traj_length*self.step_skip, int(self.traj_length))
         self.index = {}
         self.positions = {}
         self.msds = None
@@ -117,13 +128,64 @@ class OnsagerTransportAnalyzer():
 
         for specie in self.species:
             self.index[specie] = find_species(specie, self.first_structure)
-            self.positions[specie] = prep_positions(self.index[specie], self.decorated_structures)
+            self.positions[specie] = prep_positions(self.index[specie], decorated_structures)
             
         self.species = [specie for specie in self.species if len(self.index[specie]) > 0]
 
-        self.volume = np.mean([s.volume for s in self.decorated_structures]) * 1e-24 #convert to cm^3
+        self.lattice = decorated_structures[0].lattice
+        self.volume = np.mean([s.volume for s in decorated_structures]) * 1e-24 #convert to cm^3
         self.compute_L_tensor()
+        
+    def as_dict(self):
+        return {
+            'first_structure': self.first_structure.as_dict(),
+            'mapping': self.mapping,
+            'inv_mapping': self.inv_mapping,
+            'oxidation_states': self.oxidation_states,
+            'lattice': self.lattice.as_dict(),
+            'composition': self.composition,
+            'traj_length': self.traj_length,
+            'temperature': self.temperature,
+            'time_step': self.time_step,
+            'step_skip': self.step_skip,
+            'smoothing': self.smoothing,
+            'times': self.times,
+            'index': self.index,
+            'positions': self.positions,
+            'msds': self.msds,
+            'L_tensor': self.L_tensor,
+            'L_tensor_self': self.L_tensor_self,
+            'L_tensor_dis': self.L_tensor_dis,
+            'diffusivity': self.diffusivity,
+        }
     
+    @classmethod
+    def from_dict(cls, d):
+        return cls(
+            structures=[Structure.from_dict(s) for s in d['first_structure']],
+            temperature=d['temperature'],
+            mapping=d['mapping'],
+            inv_mapping=d['inv_mapping'],
+            species=d['species'],
+            oxidation_states=d['oxidation_states'],
+            lattice=Lattice.from_dict(d['lattice']),
+            composition=d['composition'],
+            traj_length=d['traj_length'],
+            time_step=d['time_step'],
+            step_skip=d['step_skip'],
+            smoothing=d['smoothing'],
+            times=d['times'],
+            index=d['index'],
+            positions=d['positions'],
+            msds=d['msds'],
+            L_tensor=d['L_tensor'],
+            L_tensor_self=d['L_tensor_self'],
+            L_tensor_dis=d['L_tensor_dis'],
+            diffusivity=d['diffusivity'],
+            **d,
+        )
+    
+    @property
     def get_available_species(self) -> List[str]:
         """
         Returns a list of available species in the system.
@@ -135,6 +197,28 @@ class OnsagerTransportAnalyzer():
         """
         return self.species.copy()
     
+    
+    @property
+    def get_L_tensor(self) -> np.ndarray:
+        """
+        Returns the transport coefficients.
+        """
+        return self.L_tensor.copy()
+    
+    @property
+    def get_L_tensor_self(self) -> np.ndarray:
+        """
+        Returns the self transport coefficients.
+        """
+        return self.L_tensor_self.copy()
+    
+    @property
+    def get_L_tensor_dis(self) -> np.ndarray:
+        """
+        Returns the distinct transport coefficients.
+        """
+        return self.L_tensor_dis.copy()
+    
     def compute_L_tensor(self, start_step: int = None, end_step: int = None):
         """
         Computes the transport coefficients for a given species.
@@ -143,9 +227,9 @@ class OnsagerTransportAnalyzer():
         :return: L_tensor: array[float], transport coefficients
         """
         if start_step is None:
-            start_step = int(len(self.decorated_structures)/10)
+            start_step = int(self.traj_length/10)
         if end_step is None:
-            end_step = int(9/10*len(self.decorated_structures))
+            end_step = int(9/10*self.traj_length)
         self.L_tensor = np.zeros((len(self.species), len(self.species)))
         self.L_tensor_self = np.zeros((len(self.species), len(self.species)))
         self.msds = {}
@@ -263,14 +347,14 @@ class OnsagerTransportAnalyzer():
         self.fit_dicts[j, i] = self.fit_dicts[i, j]
         self.L_tensor_dis = self.L_tensor - self.L_tensor_self
         
-    def compute_D_from_msd(self, specie: str, smoothed: bool = False):
+    def compute_D_from_msd(self, specie: str, smoothed: bool = False, decorated_structures: list[Structure] = None):
         """
-        Computes the diffusion coefficient from the mean squared displacement.
+        Computes the diffusion coefficient from the mean squared displacement. Very thin wrapper for the DiffusionAnalyzer class.
         :param specie: str, species for which to compute the diffusion coefficient
         :param smoothed: bool, whether to smooth the MSD data
         :return D: float, diffusion coefficient
         """
-        diff_analyzer = DiffusionAnalyzer.from_structures(self.decorated_structures, specie, self.temperature, self.time_step, self.step_skip, smoothed=smoothed)
+        diff_analyzer = DiffusionAnalyzer.from_structures(decorated_structures, specie, self.temperature, self.time_step, self.step_skip, smoothed=smoothed)
         return diff_analyzer.diffusivity, diff_analyzer.msd
         
     @classmethod
