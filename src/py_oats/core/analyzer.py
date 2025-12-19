@@ -47,9 +47,7 @@ class OnsagerTransportAnalyzer:
         self.traj_length = len(structures)
         
         # Handle oxidation states if provided
-        if oxidation_states or charge_decorator:
-            # Make accessible early for downstream use
-            self.oxidation_states = oxidation_states if oxidation_states else charge_decorator.oxidation_states
+        if oxidation_states:
             # Check if structures have magnetic moments
             has_magmoms = any(s.site_properties.get('final_magmom', None) is not None for s in structures) | any(s.site_properties.get('magmoms', None) is not None for s in structures)
             
@@ -135,56 +133,13 @@ class OnsagerTransportAnalyzer:
         self.lattice = decorated_structures[0].lattice
         self.volume = np.mean([s.volume for s in decorated_structures]) * 1e-24 #convert to cm^3
         self.compute_L_tensor()
+        for specie in self.species:
+            try:
+                self.diffusivity[specie] = self.compute_D_from_msd(specie, smoothed=False, decorated_structures=decorated_structures)[0]
+            except:
+                print(f"Warning: Diffusivity could not be computed for {specie}!")
+                self.diffusivity[specie] = None
         
-    def as_dict(self):
-        return {
-            'first_structure': self.first_structure.as_dict(),
-            'mapping': self.mapping,
-            'inv_mapping': self.inv_mapping,
-            'oxidation_states': self.oxidation_states,
-            'lattice': self.lattice.as_dict(),
-            'composition': self.composition,
-            'traj_length': self.traj_length,
-            'temperature': self.temperature,
-            'time_step': self.time_step,
-            'step_skip': self.step_skip,
-            'smoothing': self.smoothing,
-            'times': self.times,
-            'index': self.index,
-            'positions': self.positions,
-            'msds': self.msds,
-            'L_tensor': self.L_tensor,
-            'L_tensor_self': self.L_tensor_self,
-            'L_tensor_dis': self.L_tensor_dis,
-            'diffusivity': self.diffusivity,
-        }
-    
-    @classmethod
-    def from_dict(cls, d):
-        return cls(
-            structures=[Structure.from_dict(s) for s in d['first_structure']],
-            temperature=d['temperature'],
-            mapping=d['mapping'],
-            inv_mapping=d['inv_mapping'],
-            species=d['species'],
-            oxidation_states=d['oxidation_states'],
-            lattice=Lattice.from_dict(d['lattice']),
-            composition=d['composition'],
-            traj_length=d['traj_length'],
-            time_step=d['time_step'],
-            step_skip=d['step_skip'],
-            smoothing=d['smoothing'],
-            times=d['times'],
-            index=d['index'],
-            positions=d['positions'],
-            msds=d['msds'],
-            L_tensor=d['L_tensor'],
-            L_tensor_self=d['L_tensor_self'],
-            L_tensor_dis=d['L_tensor_dis'],
-            diffusivity=d['diffusivity'],
-            **d,
-        )
-    
     @property
     def get_available_species(self) -> List[str]:
         """
@@ -347,11 +302,11 @@ class OnsagerTransportAnalyzer:
         self.fit_dicts[j, i] = self.fit_dicts[i, j]
         self.L_tensor_dis = self.L_tensor - self.L_tensor_self
         
-    def compute_D_from_msd(self, specie: str, smoothed: bool = False, decorated_structures: list[Structure] = None):
+    def compute_D_from_msd(self, specie: str, smoothed: str = 'max', decorated_structures: list[Structure] = None):
         """
         Computes the diffusion coefficient from the mean squared displacement. Very thin wrapper for the DiffusionAnalyzer class.
         :param specie: str, species for which to compute the diffusion coefficient
-        :param smoothed: bool, whether to smooth the MSD data
+        :param smoothed: str, method to smooth the MSD data
         :return D: float, diffusion coefficient
         """
         diff_analyzer = DiffusionAnalyzer.from_structures(decorated_structures, specie, self.temperature, self.time_step, self.step_skip, smoothed=smoothed)
@@ -463,7 +418,7 @@ class OnsagerTransportAnalyzer:
         if isinstance(trajectory, str):
             trajectory = read(trajectory, index=f"::{skip_extra}")
         else:
-            trajectory = trajectory[skip_extra::step_skip]
+            trajectory = trajectory[::skip_extra]
         structures = [AseAtomsAdaptor.get_structure(frame) for frame in trajectory]
         try:
             for i,frame in enumerate(trajectory):
