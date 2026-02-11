@@ -2,7 +2,7 @@
 
 from pydantic import Field
 from monty.json import MSONable
-from typing import Optional, Any, List, Dict
+from typing import Optional, Any, List, Dict, Tuple
 from pymatgen.core import Composition
 from py_oats.core.analyzer import OnsagerTransportAnalyzer
         
@@ -21,6 +21,11 @@ class TransportDoc(MSONable):
         volume: float, volume of the system in A^3
         num_atoms: int, number of atoms in the system
         mapping: Dict[str, int], mapping of species to indices in the stored transport tensors.
+        msds: Dict[(int, int), list[float]], mean square displacement (generally the correlation function of the displacement)
+            of the species in cm^2/s
+        times: list[float], times of the correlation function (default in fs)
+        time_step: float, time step of the simulation in fs (default 2 fs)
+        step_skip: int, step skip of the simulation (default 1)
     
     Returns:
         TransportDoc, schema to store transport coefficients in a serializable format
@@ -37,6 +42,10 @@ class TransportDoc(MSONable):
     volume: Optional[float] = Field(None, description='volume')
     num_atoms: Optional[int] = Field(None, description='num_atoms')
     mapping: Optional[Dict[str, int]] = Field(None, description='mapping')
+    msds: Optional[Dict[Tuple[int, int], list[float]]] = Field(None, description='msds')
+    times: Optional[list[float]] = Field(None, description='times')
+    time_step: Optional[float] = Field(None, description='time_step')
+    step_skip: Optional[int] = Field(None, description='step_skip')
     
     def get_transport_coefficient(self, species : list[str|int] | int | str, self_transport: bool = False) -> float:
         """
@@ -70,4 +79,8 @@ class TransportDoc(MSONable):
         td.mapping = analyzer.mapping
         td.volume = analyzer.volume
         td.num_atoms = analyzer.first_structure.num_sites
+        td.msds = analyzer.msds
+        td.times = analyzer.times
+        td.time_step = analyzer.time_step
+        td.step_skip = analyzer.step_skip
         return td
