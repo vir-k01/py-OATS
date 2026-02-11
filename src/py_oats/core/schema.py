@@ -1,12 +1,12 @@
 """Useful schema to store OATS analysis results"""
 
-from pydantic import Field
+from pydantic import Field, BaseModel
 from monty.json import MSONable
 from typing import Optional, Any, List, Dict, Tuple
 from pymatgen.core import Composition
 from py_oats.core.analyzer import OnsagerTransportAnalyzer
         
-class TransportDoc(MSONable):
+class TransportDoc:
     """
     Schema to store transport coefficients in a serializable format
     
@@ -65,8 +65,19 @@ class TransportDoc(MSONable):
         else:
             raise ValueError("species must be a list of int, str")
     
+    
+    def as_dict(self) -> dict:
+        return self.__dict__
+    
     @classmethod
-    def from_analyzer(cls, analyzer: OnsagerTransportAnalyzer):
+    def from_dict(cls, d: dict) -> "TransportDoc":
+        td = cls()
+        for key, value in d.items():
+            setattr(td, key, value)
+        return td
+    
+    @classmethod
+    def from_analyzer(cls, analyzer: OnsagerTransportAnalyzer) -> "TransportDoc":
         td = cls()
         td.temperature = analyzer.temperature
         td.reduced_formula = analyzer.composition
