@@ -1,4 +1,4 @@
-"""ASE-based trajectory reading. Produces TrajectoryData."""
+"""ASE-based trajectory reading. Returns dict compatible with TrajectoryData.from_dict()."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import Any
 
 from ase.atoms import Atoms
 
-from .trajectory import TrajectoryData
+# Return dict keys: positions, species, lattices, properties, metadata (TrajectoryData.from_dict)
 
 
 def _arrays_from_atoms_list(
@@ -47,11 +47,10 @@ def trajectory_to_data(
     trajectory: Any,  # ASE Trajectory or list of Atoms
     *,
     metadata: dict[str, Any] | None = None,
-) -> TrajectoryData:
-    """Build TrajectoryData from an in-memory ASE trajectory (or list of Atoms)."""
+) -> dict[str, Any]:
+    """Return TrajectoryData.from_dict-compatible dict from ASE trajectory or list of Atoms."""
     if isinstance(trajectory, list):
         return atoms_to_data(trajectory, metadata=metadata or {})
-    # ASE Trajectory: indexable, len(trajectory) = n_frames
     atoms_list = [trajectory[i] for i in range(len(trajectory))]
     return atoms_to_data(atoms_list, metadata=metadata or {})
 
@@ -60,8 +59,8 @@ def atoms_to_data(
     atoms: list[Atoms],
     *,
     metadata: dict[str, Any] | None = None,
-) -> TrajectoryData:
-    """Build TrajectoryData from a list of ASE Atoms."""
+) -> dict[str, Any]:
+    """Return TrajectoryData.from_dict-compatible dict from list of ASE Atoms."""
     n_frames = len(atoms)
     if n_frames == 0:
         raise ValueError("Empty list of Atoms")
@@ -69,7 +68,7 @@ def atoms_to_data(
     a0 = atoms[0]
     n_atoms = len(a0)
 
-    species = np.array([str(a.get_chemical_symbols()[0]) for a in atoms], dtype=object)
+    species = np.array(a0.get_chemical_symbols(), dtype=object)
     positions = np.array([a.get_positions() for a in atoms], dtype=np.float64)
 
     cell0 = np.asarray(a0.get_cell(), dtype=np.float64)
@@ -81,10 +80,10 @@ def atoms_to_data(
     meta = dict(metadata or {})
     properties = _arrays_from_atoms_list(atoms, n_frames, n_atoms)
 
-    return TrajectoryData(
-        positions=positions,
-        species=species,
-        lattices=lattices,
-        properties=properties,
-        metadata=meta,
-    )
+    return {
+        "positions": positions,
+        "species": species,
+        "lattices": lattices,
+        "properties": properties,
+        "metadata": meta,
+    }

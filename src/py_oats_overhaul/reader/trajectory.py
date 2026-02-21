@@ -10,12 +10,11 @@ import numpy as np
 from pymatgen.core.trajectory import Trajectory as PmgTrajectory
 from ase.atoms import Atoms as AseAtoms
 from pymatgen.core.structure import Structure
-from ase.trajectory import Trajectory as AseTrajectory
 import ase.io
-from .utils.io.ase import trajectory_to_data as ase_trajectory_to_data
-from .utils.io.pymatgen import trajectory_to_data as pmg_trajectory_to_data
-from .utils.io.ase import atoms_to_data
-from .utils.io.pymatgen import structures_to_data
+
+from ..utils.io import ase as _ase_io
+from ..utils.io import pymatgen as _pmg_io
+
 
 @dataclass
 class TrajectoryData:
@@ -83,10 +82,31 @@ class TrajectoryData:
         pos = self.positions[:, ind, :]
         return ind, pos
 
+    def as_dict(self) -> dict[str, Any]:
+        """Return a dict with keys positions, species, lattices, properties, metadata. """
+        return {
+            "positions": self.positions,
+            "species": self.species,
+            "lattices": self.lattices,
+            "properties": self.properties,
+            "metadata": self.metadata,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> TrajectoryData:
+        """Build TrajectoryData from a dict with keys positions, species, lattices, properties, metadata . """
+        return cls(
+            positions=d["positions"],
+            species=d["species"],
+            lattices=d["lattices"],
+            properties=d["properties"],
+            metadata=d.get("metadata", {}),
+        )
+
     @classmethod
     def read(
         cls,
-        path_or_object: Path | str | PmgTrajectory | AseTrajectory | List[AseAtoms] | List[Structure],
+        path_or_object: Path | str | PmgTrajectory | List[AseAtoms] | List[Structure] | Any,
         time_step: float = 2.0,
         step_skip: int = 1,
         temperature: float | None = None,
@@ -96,7 +116,7 @@ class TrajectoryData:
         Read a trajectory from a path or in-memory object into TrajectoryData.
 
         Args:
-            path_or_object: File path to read, or trajectory object or list of structures/atoms objects (ASE/pymatgen).
+            path_or_object: File path (read via ase.io.read), list of ASE Atoms, list of Structures, or pymatgen Trajectory.
             time_step: Time step in fs.
             step_skip: Step skip used when writing the trajectory to file.
             temperature: Temperature in K.
@@ -114,16 +134,18 @@ class TrajectoryData:
             meta.setdefault("source_path", str(path_or_object))
             path_or_object = ase.io.read(str(path_or_object), index=":")
 
+        data: dict[str, Any] | None = None
         if isinstance(path_or_object, PmgTrajectory):
-            return pmg_trajectory_to_data(path_or_object, metadata=meta)
-        elif isinstance(path_or_object, AseTrajectory):
-            return ase_trajectory_to_data(path_or_object, metadata=meta)
+            data = _pmg_io.trajectory_to_data(path_or_object, metadata=meta)
         elif isinstance(path_or_object, List):
-            if path_or_object and isinstance(path_or_object[0], AseAtoms):
-                return atoms_to_data(path_or_object, metadata=meta)
-            elif path_or_object and isinstance(path_or_object[0], Structure):
-                return structures_to_data(path_or_object, metadata=meta)
+            if not path_or_object:
+                raise ValueError("Empty list of structures or atoms")
+            if isinstance(path_or_object[0], AseAtoms):
+                data = _ase_io.atoms_to_data(path_or_object, metadata=meta)
+            elif isinstance(path_or_object[0], Structure):
+                data = _pmg_io.structures_to_data(path_or_object, metadata=meta)
             else:
                 raise ValueError(f"Unsupported list of objects: {type(path_or_object[0])}")
-        else:
+        if data is None:
             raise ValueError(f"Unsupported path_or_object type: {type(path_or_object)}")
+        return cls.from_dict(data)

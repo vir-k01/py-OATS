@@ -1,4 +1,4 @@
-"""Pymatgen-based trajectory reading. Produces TrajectoryData."""
+"""Pymatgen-based trajectory reading. Returns dict compatible with TrajectoryData.from_dict()."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Any
 from pymatgen.core.trajectory import Trajectory as PmgTrajectory
 from pymatgen.core.structure import Structure
 
-from .trajectory import TrajectoryData
+# Return dict keys: positions, species, lattices, properties, metadata (TrajectoryData.from_dict)
 
 
 def _site_properties_to_arrays(
@@ -94,14 +94,8 @@ def trajectory_to_data(
     trajectory: PmgTrajectory,
     *,
     metadata: dict[str, Any],
-) -> TrajectoryData:
-    """
-    Build TrajectoryData from a pymatgen Trajectory.
-
-    - Structures: trajectory.get_structure(i) -> positions, lattices, species.
-    - Site properties (charges, magmoms, etc.): from each structure.site_properties -> (n_frames, n_atoms).
-    - Frame properties (energy, temperature, forces, velocities): from trajectory.frame_properties -> (n_frames,) or (n_frames, n_atoms) for _x,_y,_z.
-    """
+) -> dict[str, Any]:
+    """Return TrajectoryData.from_dict-compatible dict from pymatgen Trajectory."""
     n_frames = len(trajectory)
     if n_frames == 0:
         raise ValueError("Empty pymatgen trajectory")
@@ -130,13 +124,13 @@ def trajectory_to_data(
     properties.update(fp_arrays)
     meta.update(fp_meta)
 
-    return TrajectoryData(
-        positions=positions,
-        species=species,
-        lattices=lattices,
-        properties=properties,
-        metadata=meta,
-    )
+    return {
+        "positions": positions,
+        "species": species,
+        "lattices": lattices,
+        "properties": properties,
+        "metadata": meta,
+    }
 
 
 def structures_to_data(
@@ -144,14 +138,8 @@ def structures_to_data(
     *,
     metadata: dict[str, Any] | None = None,
     frame_properties: Any = None,
-) -> TrajectoryData:
-    """
-    Build TrajectoryData from a list of pymatgen Structures.
-
-    Uses the same logic as trajectory_to_data but without building a
-    PmgTrajectory. Optionally pass frame_properties (list of dicts or dict
-    keyed by frame index) for per-frame data (energy, temperature, forces, etc.).
-    """
+) -> dict[str, Any]:
+    """Return TrajectoryData.from_dict-compatible dict from list of pymatgen Structures."""
     n_frames = len(structures)
     if n_frames == 0:
         raise ValueError("Empty list of structures")
@@ -174,10 +162,10 @@ def structures_to_data(
     properties.update(fp_arrays)
     meta.update(fp_meta)
 
-    return TrajectoryData(
-        positions=positions,
-        species=species,
-        lattices=lattices,
-        properties=properties,
-        metadata=meta,
-    )
+    return {
+        "positions": positions,
+        "species": species,
+        "lattices": lattices,
+        "properties": properties,
+        "metadata": meta,
+    }
