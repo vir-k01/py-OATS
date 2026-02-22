@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from py_oats_overhaul.reader.trajectory import TrajectoryData
+from py_oats_overhaul.analyzers.base import BaseAnalyzer
 from py_oats_overhaul.analyzers.transport import TransportAnalyzer
 
 
@@ -22,6 +23,14 @@ def traj_data_transport():
         properties={},
         metadata={"temperature": 1000.0, "time_step": 2.0, "step_skip": 1, "smoothing": "best_fit"},
     )
+
+
+def test_transport_analyzer_inherits_base(traj_data_transport):
+    """TransportAnalyzer subclasses BaseAnalyzer and sets trajectory/name."""
+    assert issubclass(TransportAnalyzer, BaseAnalyzer)
+    a = TransportAnalyzer(traj_data_transport)
+    assert a.trajectory is traj_data_transport
+    assert a.name == "transport_analyzer"
 
 
 def test_transport_analyzer_requires_temperature():

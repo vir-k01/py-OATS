@@ -15,9 +15,9 @@ import numpy as np
 from ..reader.trajectory import TrajectoryData
 from ..utils.analyzers.transport.correlate import calc_Lii, calc_Lii_self, calc_Lij
 from ..utils.analyzers.transport.fitting import fit_data
+from .base import BaseAnalyzer
 
-
-class TransportAnalyzer:
+class TransportAnalyzer(BaseAnalyzer):
     """
     Compute the Onsager transport coefficients (L_ij) from TrajectoryData.
 
@@ -37,8 +37,8 @@ class TransportAnalyzer:
                 "blockavg" uses block averaging.
                 None does not smooth the data.
         """
-        self._trajectory = trajectory
-        meta = trajectory.metadata
+        super().__init__(trajectory, name="transport_analyzer")
+        meta = self.trajectory.metadata
 
         if "temperature" not in meta:
             raise ValueError("trajectory.metadata must contain 'temperature'")
@@ -47,8 +47,8 @@ class TransportAnalyzer:
         self.step_skip = int(meta.get("step_skip", 1))
         self.smoothing = smoothing
 
-        self.traj_length = trajectory.n_frames
-        self.species = trajectory.unique_species
+        self.traj_length = self.trajectory.n_frames
+        self.species = self.trajectory.unique_species
         self.mapping = {s: i for i, s in enumerate(self.species)}
         self.inv_mapping = {i: s for i, s in enumerate(self.species)}
 
@@ -57,7 +57,7 @@ class TransportAnalyzer:
         )
         self.kbT = 8.617333262e-5 * self.temperature * 10.0  # eV/atom, A^2/fs -> cm^2/s
         vol_ang3 = np.mean(
-            [np.abs(np.linalg.det(trajectory.lattice_at_frame(i))) for i in range(trajectory.n_frames)]
+            [np.abs(np.linalg.det(self.trajectory.lattice_at_frame(i))) for i in range(self.trajectory.n_frames)]
         )
         self.volume = float(vol_ang3 * 1e-24)  # Å³ → cm³
 
@@ -86,7 +86,7 @@ class TransportAnalyzer:
             end_step = (9 * T) // 10
 
         for s1 in self.species:
-            _, pos1 = self._trajectory.positions_for_species(s1)  # (n_frames, n_atoms_s, 3)
+            _, pos1 = self.trajectory.positions_for_species(s1)  # (n_frames, n_atoms_s, 3)
             total = calc_Lii(pos1)
             self_ = calc_Lii_self(pos1)
             self.correlation_functions.setdefault((s1, s1), {}).update({"total": total, "self": self_})
@@ -100,7 +100,7 @@ class TransportAnalyzer:
             for s2 in self.species:
                 if s2 == s1 or self.mapping[s2] < self.mapping[s1]:
                     continue
-                _, pos2 = self._trajectory.positions_for_species(s2)  # (n_frames, n_atoms_s2, 3)
+                _, pos2 = self.trajectory.positions_for_species(s2)  # (n_frames, n_atoms_s2, 3)
                 distinct = calc_Lij(pos1, pos2)
                 self.correlation_functions.setdefault((s1, s2), {}).update({"distinct": distinct})
                 Lij, fd = fit_data(
@@ -129,5 +129,5 @@ class TransportAnalyzer:
         if isinstance(specie, int):
             specie = self.inv_mapping[specie]
         
-        specie_amount = len(self._trajectory.species == specie)
+        specie_amount = len(self.trajectory.species == specie)
         return self.L_tensor_self[specie, specie].copy() / specie_amount
