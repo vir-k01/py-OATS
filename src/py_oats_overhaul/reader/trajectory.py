@@ -14,6 +14,7 @@ import ase.io
 
 from ..utils.io import ase as _ase_io
 from ..utils.io import pymatgen as _pmg_io
+from ..utils.unwrap import unwrap_positions
 
 
 @dataclass
@@ -68,6 +69,21 @@ class TrajectoryData:
             return self.lattices
         return self.lattices[i]
 
+    @property
+    def unique_species(self) -> list[str]:
+        """Unique species labels that have at least one atom, in first-occurrence order."""
+        seen: set[str] = set()
+        out: list[str] = []
+        for s in self.species:
+            s = str(s)
+            if s in seen:
+                continue
+            seen.add(s)
+            _, pos = self.positions_for_species(s)
+            if pos.shape[1] > 0:
+                out.append(s)
+        return out
+
     def positions_for_species(self, species_label: str) -> tuple[np.ndarray, np.ndarray]:
         """
         Indices and positions for atoms matching species_label (e.g. "Li", "Mn3+").
@@ -111,6 +127,7 @@ class TrajectoryData:
         step_skip: int = 1,
         temperature: float | None = None,
         metadata: dict[str, Any] | None = None,
+        unwrap: bool = True,
     ) -> TrajectoryData:
         """
         Read a trajectory from a path or in-memory object into TrajectoryData.
@@ -120,7 +137,8 @@ class TrajectoryData:
             time_step: Time step in fs.
             step_skip: Step skip used when writing the trajectory to file.
             temperature: Temperature in K.
-            metadata: Additional metadata to store in the TrajectoryData object (velocity, forces, charges,etc.).
+            metadata: Additional metadata to store in the TrajectoryData object (velocity, forces, charges, etc.).
+            unwrap: If True (default), unwrap positions across PBC so paths are continuous (for MSD/transport).
 
         Returns:
             TrajectoryData instance.
@@ -148,4 +166,9 @@ class TrajectoryData:
                 raise ValueError(f"Unsupported list of objects: {type(path_or_object[0])}")
         if data is None:
             raise ValueError(f"Unsupported path_or_object type: {type(path_or_object)}")
+
+        if unwrap:
+            data["positions"] = unwrap_positions(data["positions"], data["lattices"])
+            data.setdefault("metadata", {})["positions_unwrapped"] = True
+
         return cls.from_dict(data)
