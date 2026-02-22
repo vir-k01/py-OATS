@@ -45,3 +45,11 @@ class TestTrajectoryDataRead:
         assert td.metadata["step_skip"] == 2
         assert td.metadata["temperature"] == 300.0
         assert td.metadata["extra"] == "value"
+
+    def test_read_unwrap_default_true(self, ase_atoms_list):
+        td = TrajectoryData.read(ase_atoms_list, metadata={})
+        assert td.metadata.get("positions_unwrapped") is True
+
+    def test_read_unwrap_false(self, ase_atoms_list):
+        td = TrajectoryData.read(ase_atoms_list, metadata={}, unwrap=False)
+        assert td.metadata.get("positions_unwrapped") is not True

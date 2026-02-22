@@ -133,6 +133,9 @@ class TestTrajectoryDataMethods:
         assert len(ind) == 0
         assert pos.shape == (traj_data_minimal.n_frames, 0, 3)
 
+    def test_unique_species(self, traj_data_minimal):
+        assert traj_data_minimal.unique_species == ["Li", "Mn", "O"]
+
 
 class TestTrajectoryDataFromDictAsDict:
     """from_dict and as_dict round-trip; utils return from_dict-compatible dict."""
