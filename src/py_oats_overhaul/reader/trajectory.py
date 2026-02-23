@@ -14,7 +14,7 @@ import ase.io
 
 from ..utils.io import ase as _ase_io
 from ..utils.io import pymatgen as _pmg_io
-from ..utils.unwrap import unwrap_positions
+from ..utils.io.unwrap import unwrap_positions
 
 
 @dataclass
@@ -172,3 +172,23 @@ class TrajectoryData:
             data.setdefault("metadata", {})["positions_unwrapped"] = True
 
         return cls.from_dict(data)
+
+    def atoms_at_frame(self, i: int) -> AseAtoms:
+        """Return ASE Atoms object for frame i."""
+        atoms = AseAtoms(symbols=self.species[i], positions=self.positions[i], cell=self.lattice_at_frame(i))
+        for key, arr in self.properties.items():
+            if arr.shape == (self.n_atoms,):
+                atoms.set_array(key, arr)
+            elif arr.shape == (self.n_frames,):
+                atoms.set_array(key, arr[i])
+        return atoms
+    
+    def structure_at_frame(self, i: int) -> Structure:
+        """Return pymatgen Structure for frame i."""
+        struct = Structure(lattice=self.lattice_at_frame(i), species=self.species[i], coords=self.positions[i], coords_are_cartesian=True)
+        for key, arr in self.properties.items():
+            if arr.shape == (self.n_atoms,):
+                struct.add_site_property(key, arr)
+            elif arr.shape == (self.n_frames,):
+                struct.add_site_property(key, arr[i])
+        return struct
