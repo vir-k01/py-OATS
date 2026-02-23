@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from py_oats_overhaul.utils.unwrap import unwrap_positions
+from py_oats_overhaul.utils.io.unwrap import unwrap_positions
 
 
 def test_unwrap_positions_constant_lattice():

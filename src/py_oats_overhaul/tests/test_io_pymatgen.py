@@ -6,7 +6,11 @@ from pymatgen.core import Structure, Lattice
 from pymatgen.core.trajectory import Trajectory as PmgTrajectory
 
 from py_oats_overhaul.reader.trajectory import TrajectoryData
-from py_oats_overhaul.utils.io.pymatgen import structures_to_data, trajectory_to_data
+from py_oats_overhaul.utils.io.pymatgen import (
+    data_to_structures,
+    structures_to_data,
+    trajectory_to_data,
+)
 
 
 def _to_trajectory_data(data: dict) -> TrajectoryData:
@@ -80,3 +84,33 @@ class TestTrajectoryToDataPymatgen:
     def test_empty_trajectory_raises(self):
         with pytest.raises(IndexError):
             PmgTrajectory.from_structures([])
+
+
+class TestDataToStructures:
+    """data_to_structures(TrajectoryData) -> list[Structure]."""
+
+    def test_roundtrip(self, traj_data_minimal, n_frames, n_atoms):
+        structures = data_to_structures(traj_data_minimal)
+        assert len(structures) == n_frames
+        assert len(structures[0]) == n_atoms
+        data = structures_to_data(structures, metadata=dict(traj_data_minimal.metadata))
+        td = _to_trajectory_data(data)
+        np.testing.assert_array_almost_equal(td.positions, traj_data_minimal.positions)
+        np.testing.assert_array_equal(td.species, traj_data_minimal.species)
+        assert td.n_frames == n_frames and td.n_atoms == n_atoms
+
+    def test_properties_passed_to_site_properties(self, traj_data_minimal, n_frames, n_atoms):
+        """TrajectoryData with properties -> structures have site_properties."""
+        magmoms = np.random.randn(n_frames, n_atoms).astype(np.float64)
+        td = TrajectoryData(
+            positions=traj_data_minimal.positions,
+            species=traj_data_minimal.species,
+            lattices=traj_data_minimal.lattices,
+            properties={"magmoms": magmoms},
+            metadata=traj_data_minimal.metadata,
+        )
+        structures = data_to_structures(td)
+        assert "magmoms" in structures[0].site_properties
+        np.testing.assert_array_almost_equal(
+            structures[0].site_properties["magmoms"], magmoms[0]
+        )

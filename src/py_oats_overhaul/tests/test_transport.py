@@ -49,6 +49,7 @@ def test_transport_analyzer_requires_temperature():
 def test_transport_analyzer_runs(traj_data_transport):
     """TransportAnalyzer builds and computes L_tensor, fit_dicts (indexed by species order)."""
     a = TransportAnalyzer(traj_data_transport)
+    a.analyze()
     assert a.temperature == 1000.0
     assert a.time_step == 2.0
     assert a.species == ["Li", "Mn", "O"]
