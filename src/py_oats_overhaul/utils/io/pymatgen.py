@@ -3,12 +3,42 @@
 from __future__ import annotations
 
 import numpy as np
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ...reader.trajectory import TrajectoryData
 
 from pymatgen.core.trajectory import Trajectory as PmgTrajectory
 from pymatgen.core.structure import Structure
+from pymatgen.core import Lattice
 
 # Return dict keys: positions, species, lattices, properties, metadata (TrajectoryData.from_dict)
+
+
+def data_to_structures(data: "TrajectoryData") -> list[Structure]:
+    """Build list[Structure] from TrajectoryData (one Structure per frame)."""
+    T, N = data.n_frames, data.n_atoms
+    species = np.asarray(data.species, dtype=object)
+    positions = data.positions
+    lattices = data.lattices
+    if lattices.ndim == 2:
+        lattice_arr = np.broadcast_to(lattices, (T, 3, 3)).copy()
+    else:
+        lattice_arr = lattices
+    structures = []
+    for i in range(T):
+        lat = Lattice(lattice_arr[i])
+        struct = Structure(
+            lat,
+            species.tolist(),
+            positions[i],
+            coords_are_cartesian=True,
+        )
+        for key, arr in data.properties.items():
+            if arr.shape == (T, N):
+                struct.add_site_property(key, arr[i].tolist())
+        structures.append(struct)
+    return structures
 
 
 def _site_properties_to_arrays(

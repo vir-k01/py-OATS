@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import numpy as np
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ase.atoms import Atoms
+from ase.cell import Cell
+
+if TYPE_CHECKING:
+    from ...reader.trajectory import TrajectoryData
 
 # Return dict keys: positions, species, lattices, properties, metadata (TrajectoryData.from_dict)
 
