@@ -1,9 +1,5 @@
 """
 Onsager transport coefficient analyzer from trajectory MSDs.
-
-Takes TrajectoryData only. Temperature, time_step, step_skip, smoothing come from
-trajectory.metadata. Species from trajectory.species (unique, with at least one atom).
-Charge decoration is handled elsewhere; this class only computes L_tensor as fast as possible.
 """
 
 from __future__ import annotations
@@ -27,15 +23,11 @@ class TransportAnalyzer(BaseAnalyzer):
     correlation_functions and fit_dicts use (species_i, species_j) keys.
     """
 
-    def __init__(self, trajectory: TrajectoryData, smoothing: str | None = "best_fit") -> None:
+    def __init__(self, trajectory: TrajectoryData) -> None:
         """
         Args:
             trajectory: TrajectoryData. metadata must contain
                 "temperature" to perform the fitting. Optionally "time_step", "step_skip".
-            smoothing: str, type of smoothing to apply when fitting the data.
-                "best_fit" (default) brute-forces the best fit interval.
-                "blockavg" uses block averaging.
-                None does not smooth the data.
         """
         super().__init__(trajectory, name="transport_analyzer")
         meta = self.trajectory.metadata
@@ -45,7 +37,6 @@ class TransportAnalyzer(BaseAnalyzer):
         self.temperature = float(meta["temperature"])
         self.time_step = float(meta.get("time_step", 2.0))
         self.step_skip = int(meta.get("step_skip", 1))
-        self.smoothing = smoothing
 
         self.traj_length = self.trajectory.n_frames
         self.species = self.trajectory.unique_species
@@ -68,16 +59,23 @@ class TransportAnalyzer(BaseAnalyzer):
         self.fit_dicts_self = np.zeros((len(self.species), len(self.species)), dtype=object)
         self.correlation_functions: dict[tuple[str, str], dict[str, np.ndarray]] = {}
 
-        self.compute_L_tensor()
-
-    def compute_L_tensor(
+    def analyze(
         self,
         start_step: int | None = None,
         end_step: int | None = None,
+        smoothing: str | None = "best_fit",
     ) -> None:
         """
         Compute L_ij from FFT MSD/cross-MSD and linear fit. Fills L_tensor,
         L_tensor_self, L_tensor_dis; fit_dicts indexed by (i, j) species index.
+
+        Args:
+            start_step: int, start time index for fitting
+            end_step: int, end time index for fitting
+            smoothing: str, type of smoothing to apply when fitting the data.
+                "best_fit" (default) brute-forces the best fit interval.
+                "blockavg" uses block averaging.
+                None does not smooth the data.
         """
         T = self.traj_length
         if start_step is None:
@@ -91,10 +89,10 @@ class TransportAnalyzer(BaseAnalyzer):
             self_ = calc_Lii_self(pos1)
             self.correlation_functions.setdefault((s1, s1), {}).update({"total": total, "self": self_})
             self._L_tensor[self.mapping[s1], self.mapping[s1]], self.fit_dicts[self.mapping[s1], self.mapping[s1]] = fit_data(
-                total, self.times, start_step, end_step, self.smoothing
+                total, self.times, start_step, end_step, smoothing
             )
             self._L_tensor_self[self.mapping[s1], self.mapping[s1]], self.fit_dicts_self[self.mapping[s1], self.mapping[s1]] = fit_data(
-                self_, self.times, start_step, end_step, self.smoothing
+                self_, self.times, start_step, end_step, smoothing
             )
 
             for s2 in self.species:
@@ -104,7 +102,7 @@ class TransportAnalyzer(BaseAnalyzer):
                 distinct = calc_Lij(pos1, pos2)
                 self.correlation_functions.setdefault((s1, s2), {}).update({"distinct": distinct})
                 Lij, fd = fit_data(
-                    distinct, self.times, start_step, end_step, self.smoothing
+                    distinct, self.times, start_step, end_step, smoothing
                 )
                 self._L_tensor[self.mapping[s1], self.mapping[s2]] = self._L_tensor[self.mapping[s2], self.mapping[s1]] = Lij
                 self.fit_dicts[self.mapping[s1], self.mapping[s2]] = self.fit_dicts[self.mapping[s2], self.mapping[s1]] = fd
