@@ -60,6 +60,7 @@ def traj_data_minimal(positions, species, lattice_3x3):
         lattices=np.array(lattice_3x3, copy=True),
         properties={},
         metadata={},
+        composition=None,
     )
 
 
@@ -72,6 +73,7 @@ def traj_data_variable_lattice(positions, species, lattices_variable):
         lattices=lattices_variable,
         properties={},
         metadata={},
+        composition=None,
     )
 
 
