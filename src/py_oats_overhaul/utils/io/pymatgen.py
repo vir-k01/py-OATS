@@ -160,6 +160,7 @@ def trajectory_to_data(
         "lattices": lattices,
         "properties": properties,
         "metadata": meta,
+        "composition": None,
     }
 
 
@@ -198,4 +199,5 @@ def structures_to_data(
         "lattices": lattices,
         "properties": properties,
         "metadata": meta,
+        "composition": None,
     }

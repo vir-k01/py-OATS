@@ -90,4 +90,5 @@ def atoms_to_data(
         "lattices": lattices,
         "properties": properties,
         "metadata": meta,
+        "composition": None,
     }
