@@ -5,11 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, List
 from pathlib import Path
+from collections import Counter
 
 import numpy as np
 from pymatgen.core.trajectory import Trajectory as PmgTrajectory
 from ase.atoms import Atoms as AseAtoms
-from pymatgen.core.structure import Structure
+from pymatgen.core.structure import Structure, Composition
 import ase.io
 
 from ..utils.io import ase as _ase_io
@@ -38,6 +39,7 @@ class TrajectoryData:
     species: np.ndarray[str]
     lattices: np.ndarray
     properties: dict[str, np.ndarray]
+    composition: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -99,24 +101,26 @@ class TrajectoryData:
         return ind, pos
 
     def as_dict(self) -> dict[str, Any]:
-        """Return a dict with keys positions, species, lattices, properties, metadata. """
+        """Return a dict with keys positions, species, lattices, properties, metadata, composition."""
         return {
             "positions": self.positions,
             "species": self.species,
             "lattices": self.lattices,
             "properties": self.properties,
             "metadata": self.metadata,
+            "composition": self.composition,
         }
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> TrajectoryData:
-        """Build TrajectoryData from a dict with keys positions, species, lattices, properties, metadata . """
+        """Build TrajectoryData from a dict produced by `as_dict` or IO helpers."""
         return cls(
             positions=d["positions"],
             species=d["species"],
             lattices=d["lattices"],
             properties=d["properties"],
             metadata=d.get("metadata", {}),
+            composition=d.get("composition", None),
         )
 
     @classmethod
@@ -166,6 +170,15 @@ class TrajectoryData:
                 raise ValueError(f"Unsupported list of objects: {type(path_or_object[0])}")
         if data is None:
             raise ValueError(f"Unsupported path_or_object type: {type(path_or_object)}")
+
+        if data.get("composition") is None:
+            # Derive a reduced formula from species by simple counting.
+            counts = Counter(map(str, data["species"]))
+            try:
+                comp = Composition(counts)
+                data["composition"] = str(comp.reduced_formula)
+            except Exception:
+                data["composition"] = None
 
         if unwrap:
             data["positions"] = unwrap_positions(data["positions"], data["lattices"])

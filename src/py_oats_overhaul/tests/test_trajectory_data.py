@@ -142,7 +142,7 @@ class TestTrajectoryDataFromDictAsDict:
 
     def test_as_dict_has_required_keys(self, traj_data_minimal):
         d = traj_data_minimal.as_dict()
-        assert set(d.keys()) == {"positions", "species", "lattices", "properties", "metadata"}
+        assert set(d.keys()) == {"positions", "species", "lattices", "properties", "metadata", "composition"}
 
     def test_from_dict_round_trip(self, traj_data_minimal):
         d = traj_data_minimal.as_dict()
