@@ -11,13 +11,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-# Ensure src is on path when run as script (file is in src/py_oats_overhaul/tests/)
+# Ensure src is on path when run as script (file is in src/py_oats/tests/)
 _src_root = Path(__file__).resolve().parent.parent.parent  # src
 _repo_root = _src_root.parent
 if str(_src_root) not in sys.path:
     sys.path.insert(0, str(_src_root))
 
-from py_oats_overhaul.reader.trajectory import TrajectoryData
+from py_oats.reader.trajectory import TrajectoryData
 
 
 EXAMPLES_DIR = _repo_root / "examples"

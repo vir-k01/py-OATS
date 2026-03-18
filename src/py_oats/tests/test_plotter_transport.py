@@ -7,13 +7,13 @@ matplotlib.use("Agg")  # headless backend for tests
 import matplotlib.pyplot as plt
 import numpy as np
 
-from py_oats_overhaul.analyzers.transport import TransportAnalyzer
-from py_oats_overhaul.plotter.transport import (
+from py_oats.analyzers.transport import TransportAnalyzer
+from py_oats.plotter.transport import (
     plot_all_correlations,
     plot_correlation_pair,
     plot_correlation_pairwise,
 )
-from py_oats_overhaul.reader.trajectory import TrajectoryData
+from py_oats.reader.trajectory import TrajectoryData
 
 
 def _make_analyzer() -> TransportAnalyzer:

@@ -3,15 +3,15 @@
 import numpy as np
 import pytest
 
-from py_oats_overhaul.reader.trajectory import TrajectoryData
-from py_oats_overhaul.analyzers.base import BaseAnalyzer
-from py_oats_overhaul.analyzers.charge_state import ChargeStateAnalyzer
-from py_oats_overhaul.utils.analyzers.charge_state.charge import (
+from py_oats.reader.trajectory import TrajectoryData
+from py_oats.analyzers.base import BaseAnalyzer
+from py_oats.analyzers.charge_state import ChargeStateAnalyzer
+from py_oats.utils.analyzers.charge_state.charge import (
     species_string_from_element_and_oxidation,
     species_array_from_elements_and_oxi_states,
     decorate_species_naive,
 )
-from py_oats_overhaul.utils.analyzers.charge_state.oxidation import (
+from py_oats.utils.analyzers.charge_state.oxidation import (
     assign_oxidation_states,
     composition_from_species_array,
 )

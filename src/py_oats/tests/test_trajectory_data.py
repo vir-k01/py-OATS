@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from py_oats_overhaul.reader.trajectory import TrajectoryData
+from py_oats.reader.trajectory import TrajectoryData
 
 
 class TestTrajectoryDataConstruction:

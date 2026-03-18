@@ -1,12 +1,12 @@
 """
-Run pytest for py_oats_overhaul, then informal checks on examples/ trajectories.
+Run pytest for py_oats, then informal checks on examples/ trajectories.
 
 Usage (from repo root, with conda env activated):
-  PYTHONPATH=src python -m py_oats_overhaul.tests.run_tests_then_examples
+  PYTHONPATH=src python -m py_oats.tests.run_tests_then_examples
 
 Or:
   conda activate charged_oats
-  PYTHONPATH=src python src/py_oats_overhaul/tests/run_tests_then_examples.py
+  PYTHONPATH=src python src/py_oats/tests/run_tests_then_examples.py
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ if str(_src_root) not in sys.path:
 def main() -> int:
     # 1. Run pytest
     r = subprocess.run(
-        [sys.executable, "-m", "pytest", str(_src_root / "py_oats_overhaul" / "tests"), "-v", "--tb=short"],
+        [sys.executable, "-m", "pytest", str(_src_root / "py_oats" / "tests"), "-v", "--tb=short"],
         cwd=str(_src_root),
         env={**__import__("os").environ, "PYTHONPATH": str(_src_root)},
     )
@@ -34,7 +34,7 @@ def main() -> int:
 
     # 2. Run informal examples
     print("\n")
-    from py_oats_overhaul.tests.run_examples_informal import main as examples_main
+    from py_oats.tests.run_examples_informal import main as examples_main
     examples_main()
     return 0
 

@@ -3,9 +3,9 @@
 import numpy as np
 import pytest
 
-from py_oats_overhaul.reader.trajectory import TrajectoryData
-from py_oats_overhaul.analyzers.base import BaseAnalyzer
-from py_oats_overhaul.analyzers.transport import TransportAnalyzer
+from py_oats.reader.trajectory import TrajectoryData
+from py_oats.analyzers.base import BaseAnalyzer
+from py_oats.analyzers.transport import TransportAnalyzer
 
 
 @pytest.fixture

@@ -9,9 +9,9 @@ import numpy as np
 from matplotlib.ticker import ScalarFormatter
 from pymatgen.core import Element
 
-from py_oats_overhaul.analyzers.transport import TransportAnalyzer
-from py_oats_overhaul.schemas.transport import TransportDoc
-from py_oats_overhaul.utils.plotting import color_cycle, setup_figure
+from py_oats.analyzers.transport import TransportAnalyzer
+from py_oats.schemas.transport import TransportDoc
+from py_oats.utils.plotting import color_cycle, setup_figure
 
 AnalyzerLike = Union[TransportAnalyzer, TransportDoc]
 

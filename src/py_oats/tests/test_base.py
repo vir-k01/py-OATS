@@ -2,8 +2,8 @@
 
 import pytest
 
-from py_oats_overhaul.reader.trajectory import TrajectoryData
-from py_oats_overhaul.analyzers.base import BaseAnalyzer
+from py_oats.reader.trajectory import TrajectoryData
+from py_oats.analyzers.base import BaseAnalyzer
 
 
 def test_base_analyzer_instantiation(traj_data_minimal):

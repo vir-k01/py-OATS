@@ -8,7 +8,7 @@ import numpy as np
 from pydantic import BaseModel, Field
 from pymatgen.core import Composition
 
-from py_oats_overhaul.analyzers.transport import TransportAnalyzer
+from py_oats.analyzers.transport import TransportAnalyzer
 
 
 class TransportDoc(BaseModel):

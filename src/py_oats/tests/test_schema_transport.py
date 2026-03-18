@@ -2,9 +2,9 @@
 
 import numpy as np
 
-from py_oats_overhaul.analyzers.transport import TransportAnalyzer
-from py_oats_overhaul.reader.trajectory import TrajectoryData
-from py_oats_overhaul.schemas.transport import TransportDoc
+from py_oats.analyzers.transport import TransportAnalyzer
+from py_oats.reader.trajectory import TrajectoryData
+from py_oats.schemas.transport import TransportDoc
 
 
 def _make_simple_analyzer() -> TransportAnalyzer:

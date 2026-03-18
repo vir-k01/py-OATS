@@ -5,8 +5,8 @@ import pytest
 from pymatgen.core import Structure, Lattice
 from pymatgen.core.trajectory import Trajectory as PmgTrajectory
 
-from py_oats_overhaul.reader.trajectory import TrajectoryData
-from py_oats_overhaul.utils.io.pymatgen import (
+from py_oats.reader.trajectory import TrajectoryData
+from py_oats.utils.io.pymatgen import (
     data_to_structures,
     structures_to_data,
     trajectory_to_data,
