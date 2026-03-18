@@ -3,7 +3,7 @@
 import numpy as np
 
 from py_oats.analyzers.transport import TransportAnalyzer
-from py_oats.reader.trajectory import TrajectoryData
+from py_oats.io.trajectory import TrajectoryData
 from py_oats.schemas.transport import TransportDoc
 
 

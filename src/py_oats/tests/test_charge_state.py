@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from py_oats.reader.trajectory import TrajectoryData
+from py_oats.io.trajectory import TrajectoryData
 from py_oats.analyzers.base import BaseAnalyzer
 from py_oats.analyzers.charge_state import ChargeStateAnalyzer
 from py_oats.utils.analyzers.charge_state.charge import (

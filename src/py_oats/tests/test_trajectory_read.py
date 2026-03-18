@@ -5,7 +5,7 @@ from ase.atoms import Atoms
 from ase.cell import Cell
 from pymatgen.core import Structure, Lattice
 
-from py_oats.reader.trajectory import TrajectoryData
+from py_oats.io.trajectory import TrajectoryData
 
 
 class TestTrajectoryDataRead:

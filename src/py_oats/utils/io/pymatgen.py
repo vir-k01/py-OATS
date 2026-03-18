@@ -6,7 +6,7 @@ import numpy as np
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from ...reader.trajectory import TrajectoryData
+    from ...io.trajectory import TrajectoryData
 
 from pymatgen.core.trajectory import Trajectory as PmgTrajectory
 from pymatgen.core.structure import Structure

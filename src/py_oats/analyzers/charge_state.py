@@ -7,7 +7,7 @@ converting the full trajectory to pymatgen unless the chosen path requires it.
 from __future__ import annotations
 
 from .base import BaseAnalyzer
-from ..reader.trajectory import TrajectoryData
+from ..io.trajectory import TrajectoryData
 from ..utils.analyzers.charge_state.charge import (
     _element_from_species_string,
     _initial_boundaries,

@@ -2,7 +2,7 @@
 
 import pytest
 
-from py_oats.reader.trajectory import TrajectoryData
+from py_oats.io.trajectory import TrajectoryData
 from py_oats.analyzers.base import BaseAnalyzer
 
 

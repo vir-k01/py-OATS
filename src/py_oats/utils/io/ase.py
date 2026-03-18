@@ -9,7 +9,7 @@ from ase.atoms import Atoms
 from ase.cell import Cell
 
 if TYPE_CHECKING:
-    from ...reader.trajectory import TrajectoryData
+    from ...io.trajectory import TrajectoryData
 
 # Return dict keys: positions, species, lattices, properties, metadata (TrajectoryData.from_dict)
 

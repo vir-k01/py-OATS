@@ -17,7 +17,7 @@ _repo_root = _src_root.parent
 if str(_src_root) not in sys.path:
     sys.path.insert(0, str(_src_root))
 
-from py_oats.reader.trajectory import TrajectoryData
+from py_oats.io.trajectory import TrajectoryData
 
 
 EXAMPLES_DIR = _repo_root / "examples"

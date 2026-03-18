@@ -1,5 +1,5 @@
 """ Base class for all analyzers. """
-from py_oats.reader.trajectory import TrajectoryData
+from py_oats.io.trajectory import TrajectoryData
 
 class BaseAnalyzer:
     """

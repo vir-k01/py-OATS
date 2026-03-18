@@ -15,7 +15,7 @@ from .oxidation import assign_oxidation_states
 from ase.calculators.calculator import Calculator
 
 if TYPE_CHECKING:
-    from ....reader.trajectory import TrajectoryData
+    from ....io.trajectory import TrajectoryData
 
 
 def _trajectory_chunk(
@@ -26,7 +26,7 @@ def _trajectory_chunk(
     metadata_extra: dict[str, Any] | None = None,
 ) -> "TrajectoryData":
     """Build TrajectoryData for frames [start:end] with given species (length N)."""
-    from ....reader.trajectory import TrajectoryData
+    from ....io.trajectory import TrajectoryData
 
     T, N = trajectory.n_frames, trajectory.n_atoms
     positions = trajectory.positions[start:end]

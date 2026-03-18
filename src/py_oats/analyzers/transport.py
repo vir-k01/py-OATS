@@ -8,7 +8,7 @@ from typing import Any
 
 import numpy as np
 
-from ..reader.trajectory import TrajectoryData
+from ..io.trajectory import TrajectoryData
 from ..utils.analyzers.transport.correlate import calc_Lii, calc_Lii_self, calc_Lij
 from ..utils.analyzers.transport.fitting import fit_data
 from .base import BaseAnalyzer

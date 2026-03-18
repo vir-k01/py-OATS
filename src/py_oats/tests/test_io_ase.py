@@ -5,7 +5,7 @@ import pytest
 from ase.atoms import Atoms
 from ase.cell import Cell
 
-from py_oats.reader.trajectory import TrajectoryData
+from py_oats.io.trajectory import TrajectoryData
 from py_oats.utils.io.ase import atoms_to_data, trajectory_to_data
 
 
