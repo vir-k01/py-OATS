@@ -5,7 +5,7 @@ import pytest
 
 from py_oats.io.trajectory import TrajectoryData
 from py_oats.analyzers.base import BaseAnalyzer
-from py_oats.analyzers.transport import TransportAnalyzer
+from py_oats.analyzers.transport import TransportAnalyzer, correlation_pair_key
 
 
 @pytest.fixture
@@ -63,10 +63,10 @@ def test_transport_analyzer_runs(traj_data_transport):
     assert "fit_err" in a.fit_dicts_self[0, 0]
     # L_tensor_dis = L_tensor - L_tensor_self
     np.testing.assert_array_almost_equal(a.L_tensor_dis, a.L_tensor - a.L_tensor_self)
-    # correlation_functions keyed by (species_i, species_j) for plotting
-    assert ("Li", "Li") in a.correlation_functions
-    assert set(a.correlation_functions[("Li", "Li")].keys()) == {"total", "self"}
-    assert a.correlation_functions[("Li", "Li")]["total"].shape == (40,)
-    assert ("Li", "Mn") in a.correlation_functions
-    assert set(a.correlation_functions[("Li", "Mn")].keys()) == {"distinct"}
-    assert ("O", "O") in a.correlation_functions
+    # correlation_functions keyed by species_i-species_j strings
+    assert correlation_pair_key("Li", "Li") in a.correlation_functions
+    assert set(a.correlation_functions[correlation_pair_key("Li", "Li")].keys()) == {"total", "self"}
+    assert a.correlation_functions[correlation_pair_key("Li", "Li")]["total"].shape == (40,)
+    assert correlation_pair_key("Li", "Mn") in a.correlation_functions
+    assert set(a.correlation_functions[correlation_pair_key("Li", "Mn")].keys()) == {"distinct"}
+    assert correlation_pair_key("O", "O") in a.correlation_functions

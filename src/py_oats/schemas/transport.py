@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
+from monty.json import MontyDecoder
 from pydantic import BaseModel, Field
 from pymatgen.core import Composition
 
@@ -28,8 +29,7 @@ class TransportDoc(BaseModel):
         volume: Volume of the simulation cell in Å³.
         num_atoms: Number of atoms in the system.
         mapping: Mapping of species labels to indices in stored tensors.
-        correlation_functions: Correlation functions keyed by
-            \((i, j)\) index pairs.
+        correlation_functions: Correlation functions keyed by ``"species_i-species_j"`` strings.
         times: Time grid corresponding to correlation functions (default in fs).
         time_step: Time step of the simulation in fs.
         step_skip: Step skip of the simulation.
@@ -51,7 +51,7 @@ class TransportDoc(BaseModel):
         None, description="mapping of species labels to tensor indices"
     )
     correlation_functions: Optional[Any] = Field(
-        None, description="correlation functions keyed by (species_i, species_j) indices"
+        None, description="correlation functions keyed by species_i-species_j"
     )
     fit_dicts: Optional[Any] = Field(
         None, description="fit dictionaries (often 2D object arrays)"
@@ -91,11 +91,14 @@ class TransportDoc(BaseModel):
     def as_dict(self) -> dict:
         """Return a dictionary representation (for JSON/YAML storage)."""
         return self.model_dump()
-    
+
     @classmethod
     def from_dict(cls, d: dict) -> "TransportDoc":
-        """Construct `TransportDoc` from a dictionary."""
-        return cls.model_validate(d)
+        """Construct `TransportDoc` from a dict (plain JSON or Monty ``dumpfn`` / MSON)."""
+        decoded = MontyDecoder().process_decoded(d)
+        if isinstance(decoded, cls):
+            return decoded
+        return cls.model_validate(decoded)
 
     @classmethod
     def from_analyzer(cls, analyzer: TransportAnalyzer) -> "TransportDoc":

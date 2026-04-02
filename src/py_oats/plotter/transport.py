@@ -9,7 +9,7 @@ import numpy as np
 from matplotlib.ticker import ScalarFormatter
 from pymatgen.core import Element
 
-from py_oats.analyzers.transport import TransportAnalyzer
+from py_oats.analyzers.transport import TransportAnalyzer, correlation_pair_key
 from py_oats.schemas.transport import TransportDoc
 from py_oats.utils.plotting import color_cycle, setup_figure
 
@@ -58,7 +58,7 @@ def plot_correlation_pair(
     idx_j = _resolve_index(doc, j)
     s_i = doc.species[idx_i]
     s_j = doc.species[idx_j]
-    key = (s_i, s_j)
+    key = correlation_pair_key(s_i, s_j)
     if key not in doc.correlation_functions:
         raise KeyError(f"No correlation data for pair {key}")
 
@@ -126,14 +126,14 @@ def plot_correlation_pairwise(
     for i in range(n_species):
         s_i = doc.species[i]
         # auto
-        cf_auto = doc.correlation_functions.get((s_i, s_i))
+        cf_auto = doc.correlation_functions.get(correlation_pair_key(s_i, s_i))
         if cf_auto and "total" in cf_auto:
             ax.plot(times, cf_auto["total"], label=f"{s_i}-{s_i} total", color=colors[c_idx], linewidth=2)
             c_idx += 1
         # cross
         for j in range(i + 1, n_species):
             s_j = doc.species[j]
-            cf = doc.correlation_functions.get((s_i, s_j))
+            cf = doc.correlation_functions.get(correlation_pair_key(s_i, s_j))
             if cf and "distinct" in cf:
                 ax.plot(times, cf["distinct"], label=f"{s_i}-{s_j} distinct", color=colors[c_idx], linewidth=2)
                 c_idx += 1
@@ -176,7 +176,7 @@ def plot_all_correlations(analyzer_or_doc: AnalyzerLike) -> Any:
     for i, si in enumerate(species):
         for j, sj in enumerate(species):
             ax = axes_arr[i, j]
-            key = (si, sj)
+            key = correlation_pair_key(si, sj)
             cf = doc.correlation_functions.get(key)
             if not cf:
                 ax.axis("off")

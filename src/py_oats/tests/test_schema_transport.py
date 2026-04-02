@@ -1,5 +1,8 @@
 """Tests for TransportDoc schema."""
 
+import json
+from pathlib import Path
+
 import numpy as np
 
 from py_oats.analyzers.transport import TransportAnalyzer
@@ -73,4 +76,46 @@ def test_transport_doc_roundtrip_dict():
     assert doc2.species == doc.species
     assert doc2.mapping == doc.mapping
     assert doc2.L_tensor.shape == doc.L_tensor.shape
+
+
+def test_transport_doc_from_monty_numpy_dict():
+    """Monty-encoded numpy arrays (dumpfn) deserialize to ndarrays."""
+    d = {
+        "species": ["A"],
+        "L_tensor": {
+            "@module": "numpy",
+            "@class": "array",
+            "dtype": "float64",
+            "data": [[1.0, 2.0], [3.0, 4.0]],
+        },
+        "L_tensor_self": {
+            "@module": "numpy",
+            "@class": "array",
+            "dtype": "float64",
+            "data": [[1.0, 0.0], [0.0, 1.0]],
+        },
+        "L_tensor_dis": {
+            "@module": "numpy",
+            "@class": "array",
+            "dtype": "float64",
+            "data": [[0.0, 2.0], [3.0, 3.0]],
+        },
+        "mapping": {"A": 0},
+        "temperature": 300.0,
+    }
+    doc = TransportDoc.from_dict(d)
+    assert isinstance(doc.L_tensor, np.ndarray)
+    assert doc.L_tensor.shape == (2, 2)
+    np.testing.assert_allclose(doc.L_tensor, [[1.0, 2.0], [3.0, 4.0]])
+
+
+def test_transport_doc_example_json_file():
+    """examples/transport_doc.json (Monty-style) loads if present."""
+    path = Path(__file__).resolve().parents[3] / "examples" / "transport_doc.json"
+    if not path.is_file():
+        return
+    d = json.loads(path.read_text())
+    doc = TransportDoc.from_dict(d)
+    assert doc.L_tensor.shape == (3, 3)
+    assert doc.correlation_functions is not None
 

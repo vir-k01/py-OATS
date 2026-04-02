@@ -13,6 +13,12 @@ from ..utils.analyzers.transport.correlate import calc_Lii, calc_Lii_self, calc_
 from ..utils.analyzers.transport.fitting import fit_data
 from .base import BaseAnalyzer
 
+
+def correlation_pair_key(s1: str, s2: str) -> str:
+    """Key for ``correlation_functions`` (JSON-friendly string, not a tuple)."""
+    return f"{s1}-{s2}"
+
+
 class TransportAnalyzer(BaseAnalyzer):
     """
     Compute the Onsager transport coefficients (L_ij) from TrajectoryData.
@@ -20,7 +26,8 @@ class TransportAnalyzer(BaseAnalyzer):
     All run parameters (temperature, time_step, step_skip) are read from
     trajectory.metadata. Species are the unique labels in trajectory.species that
     have at least one atom. L_tensor ordering matches self.species;
-    correlation_functions and fit_dicts use (species_i, species_j) keys.
+    correlation_functions uses ``correlation_pair_key(species_i, species_j)`` strings;
+    fit_dicts are indexed by (i, j) species index.
     """
 
     def __init__(self, trajectory: TrajectoryData) -> None:
@@ -57,7 +64,7 @@ class TransportAnalyzer(BaseAnalyzer):
         self._L_tensor_self = np.zeros((len(self.species), len(self.species)))
         self.fit_dicts = np.zeros((len(self.species), len(self.species)), dtype=object)
         self.fit_dicts_self = np.zeros((len(self.species), len(self.species)), dtype=object)
-        self.correlation_functions: dict[tuple[str, str], dict[str, np.ndarray]] = {}
+        self.correlation_functions: dict[str, dict[str, np.ndarray]] = {}
 
     def analyze(
         self,
@@ -87,7 +94,7 @@ class TransportAnalyzer(BaseAnalyzer):
             _, pos1 = self.trajectory.positions_for_species(s1)  # (n_frames, n_atoms_s, 3)
             total = calc_Lii(pos1)
             self_ = calc_Lii_self(pos1)
-            self.correlation_functions.setdefault((s1, s1), {}).update({"total": total, "self": self_})
+            self.correlation_functions.setdefault(correlation_pair_key(s1, s1), {}).update({"total": total, "self": self_})
             self._L_tensor[self.mapping[s1], self.mapping[s1]], self.fit_dicts[self.mapping[s1], self.mapping[s1]] = fit_data(
                 total, self.times, start_step, end_step, smoothing
             )
@@ -100,7 +107,7 @@ class TransportAnalyzer(BaseAnalyzer):
                     continue
                 _, pos2 = self.trajectory.positions_for_species(s2)  # (n_frames, n_atoms_s2, 3)
                 distinct = calc_Lij(pos1, pos2)
-                self.correlation_functions.setdefault((s1, s2), {}).update({"distinct": distinct})
+                self.correlation_functions.setdefault(correlation_pair_key(s1, s2), {}).update({"distinct": distinct})
                 Lij, fd = fit_data(
                     distinct, self.times, start_step, end_step, smoothing
                 )
