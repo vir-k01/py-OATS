@@ -124,8 +124,8 @@ class TransportAnalyzer(BaseAnalyzer):
 
     def get_diffusivity(self, specie: str | int) -> float:
         """Get the Einstein self-diffusion coefficient for a given species in cm^2/s"""
-        if isinstance(specie, int):
-            specie = self.inv_mapping[specie]
+        if isinstance(specie, str):
+            specie = self.mapping[specie]
         
-        specie_amount = len(self.trajectory.species == specie)
+        specie_amount = len(self.trajectory.species[self.trajectory.species == self.inv_mapping[specie]])
         return self.L_tensor_self[specie, specie].copy() / specie_amount

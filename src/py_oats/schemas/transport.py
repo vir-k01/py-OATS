@@ -35,7 +35,7 @@ class TransportDoc(BaseModel):
         step_skip: Step skip of the simulation.
     """
 
-    composition: Optional[Composition] = Field(None, description="composition")
+    composition: Optional[Composition | str] = Field(None, description="composition")
     reduced_formula: Optional[str] = Field(None, description="reduced_formula")
     species: Optional[List[str]] = Field(None, description="species")
     L_tensor: Optional[np.ndarray] = Field(None, description="L_tensor")
