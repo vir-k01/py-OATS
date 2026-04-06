@@ -188,7 +188,12 @@ class TrajectoryData:
 
     def atoms_at_frame(self, i: int) -> AseAtoms:
         """Return ASE Atoms object for frame i."""
-        atoms = AseAtoms(symbols=self.species[i], positions=self.positions[i], cell=self.lattice_at_frame(i))
+        atoms = AseAtoms(
+            symbols=[str(s) for s in self.species],
+            positions=self.positions[i],
+            cell=self.lattice_at_frame(i),
+            pbc=True,
+        )
         for key, arr in self.properties.items():
             if arr.shape == (self.n_atoms,):
                 atoms.set_array(key, arr)
@@ -198,7 +203,12 @@ class TrajectoryData:
     
     def structure_at_frame(self, i: int) -> Structure:
         """Return pymatgen Structure for frame i."""
-        struct = Structure(lattice=self.lattice_at_frame(i), species=self.species[i], coords=self.positions[i], coords_are_cartesian=True)
+        struct = Structure(
+            lattice=self.lattice_at_frame(i),
+            species=[str(s) for s in self.species],
+            coords=self.positions[i],
+            coords_are_cartesian=True,
+        )
         for key, arr in self.properties.items():
             if arr.shape == (self.n_atoms,):
                 struct.add_site_property(key, arr)
