@@ -52,6 +52,13 @@ class INMAnalyzer(BaseAnalyzer):
     Calculators that are not copyable or pickleable (common with **pyace GRACE** potentials)
     should use ``calculator_factory=lambda: ...`` so each parallel task gets a new
     calculator instance; otherwise pass ``parallel_frames=False`` and ``parallel=False``.
+
+    **CPU usage:** Finite-difference columns only run in parallel when ``parallel=True``
+    (default). You still often see **one core** if: (1) the structure has **fewer than
+    100 atoms** (defaults to **one** column worker—override with ``max_workers``), (2) only **one**
+    frame is sampled (no frame pool), (3) the calculator exposes **``get_hessian``** so FD
+    columns are skipped, or (4) the calculator is **Python-bound** (GIL). For small cells,
+    e.g. ``max_workers=min(16, (os.cpu_count() or 8) - 8)`` together with ``parallel=True``.
     """
 
     def __init__(self, trajectory: TrajectoryData, calculator: Calculator) -> None:
@@ -70,7 +77,7 @@ class INMAnalyzer(BaseAnalyzer):
         compute_frequency: int,
         finite_difference_step: float = 0.01,
         *,
-        parallel: bool = False,
+        parallel: bool = True,
         max_workers: int | None = None,
         calculator_factory: Callable[[], Calculator] | None = None,
         parallel_frames: bool = True,
