@@ -77,7 +77,7 @@ class INMAnalyzer(BaseAnalyzer):
         compute_frequency: int,
         finite_difference_step: float = 0.01,
         *,
-        parallel: bool = True,
+        parallel: bool = False,
         max_workers: int | None = None,
         calculator_factory: Callable[[], Calculator] | None = None,
         parallel_frames: bool = True,
