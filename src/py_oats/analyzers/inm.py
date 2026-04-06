@@ -48,6 +48,10 @@ class INMAnalyzer(BaseAnalyzer):
     ``min(frames, 8, cpus − column_workers)``, so when columns need few threads, more
     cores can go to **frames**; when columns ramp up, the frame pool shrinks accordingly.
     Overrides: ``frame_max_workers``, ``max_workers``, ``parallel_frames=False``.
+
+    Calculators that are not copyable or pickleable (common with **pyace GRACE** potentials)
+    should use ``calculator_factory=lambda: ...`` so each parallel task gets a new
+    calculator instance; otherwise pass ``parallel_frames=False`` and ``parallel=False``.
     """
 
     def __init__(self, trajectory: TrajectoryData, calculator: Calculator) -> None:

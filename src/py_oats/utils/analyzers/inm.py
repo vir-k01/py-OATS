@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import os
+import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, Sequence, TypeVar
 
@@ -122,7 +123,15 @@ def map_thread_pool(
 
 
 def copy_calculator(calc: Calculator) -> Calculator:
-    """Best-effort independent calculator instance for concurrent frame/column work."""
+    """
+    Best-effort independent calculator for concurrent frame/column work.
+
+    Some calculators (e.g. pyace GRACE with ``GRACEFSBasisSet``) cannot be ``deepcopy``'d
+    because internal objects are not pickleable. We try ``calc.copy()``, then shallow
+    ``copy.copy``, then ``deepcopy``. If all fail, raise with guidance to pass
+    ``calculator_factory`` to :meth:`~py_oats.analyzers.inm.INMAnalyzer.analyze` or run
+    with ``parallel_frames=False`` and ``parallel=False``.
+    """
     if hasattr(calc, "copy"):
         try:
             c = calc.copy()
@@ -130,7 +139,30 @@ def copy_calculator(calc: Calculator) -> Calculator:
                 return c
         except Exception:
             pass
-    return copy.deepcopy(calc)
+    try:
+        return copy.deepcopy(calc)
+    except Exception:
+        pass
+    try:
+        c = copy.copy(calc)
+        if c is not calc:
+            warnings.warn(
+                "Calculator could not be deep-copied; using a shallow copy for parallel INM. "
+                "If results are unstable, pass calculator_factory=... to build a fresh "
+                "calculator per task, or disable parallelism.",
+                UserWarning,
+                stacklevel=2,
+            )
+            return c
+    except Exception:
+        pass
+    raise RuntimeError(
+        "Could not duplicate the ASE calculator for parallel INM (copy/deepcopy failed; "
+        "common with pyace GRACE / GRACEFSBasisSet). Pass "
+        "`calculator_factory=lambda: <construct a new calculator>` to "
+        "`INMAnalyzer.analyze()`, or use `parallel_frames=False` and `parallel=False` "
+        "to run sequentially with one calculator."
+    )
 
 
 def mass_weighted_dynamical_matrix(hessian: np.ndarray, masses_amu: np.ndarray) -> np.ndarray:
