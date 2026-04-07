@@ -57,6 +57,28 @@ class TrajectoryData:
                 raise ValueError(f"property {name} must be \
                     (n_frames, n_atoms), (n_atoms,) or (n_frames), got {array.shape}")
 
+        # Sanity flag: after unwrapping (if done upstream), fractional coordinates should not
+        # drift far outside the primary cell. If they do, downstream analyses that assume
+        # reasonable PBC unwrapping may produce misleading results.
+        
+        self.metadata.setdefault("is_sensible", True)
+        try:
+            if self.lattices.ndim == 2:
+                invL = np.linalg.inv(self.lattices)
+                frac = self.positions @ invL
+                if not np.all((frac > -1.0) & (frac < 1.0)):
+                    self.metadata["is_sensible"] = False
+            else:
+                for t in range(T):
+                    invL = np.linalg.inv(self.lattices[t])
+                    frac = self.positions[t] @ invL
+                    if not np.all((frac > -1.0) & (frac < 1.0)):
+                        self.metadata["is_sensible"] = False
+                        break
+        except Exception:
+            # If the lattice is singular or inversion fails, treat as not sensible.
+            self.metadata["is_sensible"] = False
+
     @property
     def n_frames(self) -> int:
         return self.positions.shape[0]

@@ -24,6 +24,7 @@ class TestTrajectoryDataConstruction:
         assert td.positions.shape == (n_frames, n_atoms, 3)
         assert td.species.shape == (n_atoms,)
         assert td.lattices.ndim == 2 and td.lattices.shape == (3, 3)
+        assert td.metadata["is_sensible"] is True
 
     def test_variable_lattice(
         self, positions, species, lattices_variable, n_frames, n_atoms
@@ -51,6 +52,20 @@ class TestTrajectoryDataConstruction:
         assert td.properties["magmoms"].shape == (n_frames, n_atoms)
         assert td.properties["energy"].shape == (n_frames,)
         assert td.metadata["time_step"] == 2.0
+
+    def test_is_sensible_flag_false_when_fractional_outside_bounds(self):
+        # Identity lattice => fractional == cartesian.
+        positions = np.zeros((2, 2, 3), dtype=np.float64)
+        positions[0, 0, 0] = 2.0  # outside (-1, 1)
+        species = np.array(["Li", "O"], dtype=object)
+        td = TrajectoryData(
+            positions=positions,
+            species=species,
+            lattices=np.eye(3, dtype=np.float64),
+            properties={},
+            metadata={"is_sensible": True},
+        )
+        assert td.metadata["is_sensible"] is False
 
 
 class TestTrajectoryDataValidation:
@@ -163,4 +178,5 @@ class TestTrajectoryDataFromDictAsDict:
             "properties": {},
         }
         td = TrajectoryData.from_dict(d)
-        assert td.metadata == {}
+        # TrajectoryData always sets a sanity flag in metadata.
+        assert td.metadata["is_sensible"] in (True, False)
