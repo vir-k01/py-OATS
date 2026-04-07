@@ -57,26 +57,27 @@ class TrajectoryData:
                 raise ValueError(f"property {name} must be \
                     (n_frames, n_atoms), (n_atoms,) or (n_frames), got {array.shape}")
 
-        # Sanity flag: after unwrapping (if done upstream), fractional coordinates should not
-        # drift far outside the primary cell. If they do, downstream analyses that assume
-        # reasonable PBC unwrapping may produce misleading results.
-        
+        # Sanity flag: a coarse density proxy based on the average cell edge length.
+        # For an (approximately) cubic cell with average edge length a ≈ trace(L)/3,
+        # define a^3 / N. Mark not sensible if this exceeds 1000 (very dilute / likely
+        # a units/scale issue for many workflows).
+        #
+        # Default True, but set False if any frame violates the threshold.
         self.metadata.setdefault("is_sensible", True)
         try:
             if self.lattices.ndim == 2:
-                invL = np.linalg.inv(self.lattices)
-                frac = self.positions @ invL
-                if not np.all((frac > -1.0) & (frac < 1.0)):
+                a = float(np.trace(self.lattices) / 3.0)
+                vol_per_atom = (a**3) / float(len(self.species))
+                if not (vol_per_atom < 1000.0):
                     self.metadata["is_sensible"] = False
             else:
                 for t in range(T):
-                    invL = np.linalg.inv(self.lattices[t])
-                    frac = self.positions[t] @ invL
-                    if not np.all((frac > -1.0) & (frac < 1.0)):
+                    a = float(np.trace(self.lattices[t]) / 3.0)
+                    vol_per_atom = (a**3) / float(len(self.species))
+                    if not (vol_per_atom < 1000.0):
                         self.metadata["is_sensible"] = False
                         break
         except Exception:
-            # If the lattice is singular or inversion fails, treat as not sensible.
             self.metadata["is_sensible"] = False
 
     @property

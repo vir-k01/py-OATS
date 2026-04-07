@@ -53,15 +53,13 @@ class TestTrajectoryDataConstruction:
         assert td.properties["energy"].shape == (n_frames,)
         assert td.metadata["time_step"] == 2.0
 
-    def test_is_sensible_flag_false_when_fractional_outside_bounds(self):
-        # Identity lattice => fractional == cartesian.
+    def test_is_sensible_flag_false_when_volume_per_atom_too_large(self):
         positions = np.zeros((2, 2, 3), dtype=np.float64)
-        positions[0, 0, 0] = 2.0  # outside (-1, 1)
         species = np.array(["Li", "O"], dtype=object)
         td = TrajectoryData(
             positions=positions,
             species=species,
-            lattices=np.eye(3, dtype=np.float64),
+            lattices=np.eye(3, dtype=np.float64) * 20.0,  # a^3 / N = 8000/2 = 4000 > 1000
             properties={},
             metadata={"is_sensible": True},
         )
