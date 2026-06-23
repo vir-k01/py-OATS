@@ -135,4 +135,4 @@ class TransportAnalyzer(BaseAnalyzer):
             specie = self.mapping[specie]
         
         specie_amount = len(self.trajectory.species[self.trajectory.species == self.inv_mapping[specie]])
-        return self.L_tensor_self[specie, specie].copy() / specie_amount
+        return self._L_tensor_self[specie, specie].copy() * self.scaling_factor / specie_amount
