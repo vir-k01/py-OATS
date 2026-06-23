@@ -9,7 +9,10 @@ dependencies = [
   "pymatgen",
   "pandas",
   "pymatgen-analysis-diffusion",
-  "chgnet"
+  "chgnet",
+  "ase",
+  "pydantic",
+  "monty"
 ]
 requires-python = ">=3.8"
 authors = [
