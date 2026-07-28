@@ -135,4 +135,6 @@ class TransportAnalyzer(BaseAnalyzer):
             specie = self.mapping[specie]
         
         specie_amount = len(self.trajectory.species[self.trajectory.species == self.inv_mapping[specie]])
-        return self._L_tensor_self[specie, specie].copy() * self.scaling_factor / specie_amount
+        # _L_tensor_self[i,i] is the slope of Σ_atoms MSD(t) in Å²/fs.
+        # D_self = slope / (6 * N) * 0.1  (0.1 = Å²/fs → cm²/s conversion)
+        return self._L_tensor_self[specie, specie].copy() / (6.0 * specie_amount) * 0.1
