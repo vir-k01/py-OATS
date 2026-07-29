@@ -198,7 +198,7 @@ class TrajectoryData:
     
     def structure_at_frame(self, i: int) -> Structure:
         """Return pymatgen Structure for frame i."""
-        struct = Structure(lattice=self.lattice_at_frame(i), species=self.species[i], coords=self.positions[i], coords_are_cartesian=True)
+        struct = Structure(lattice=self.lattice_at_frame(i), species=[str(s) for s in self.species], coords=self.positions[i], coords_are_cartesian=True)
         for key, arr in self.properties.items():
             if arr.shape == (self.n_atoms,):
                 struct.add_site_property(key, arr)
