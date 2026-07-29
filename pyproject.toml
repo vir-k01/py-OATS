@@ -5,15 +5,21 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "py_oats"
 version = "0.1.0"
-dependencies = [
-  "pymatgen",
-  "pandas",
-  "pymatgen-analysis-diffusion",
-  "chgnet"
-]
-requires-python = ">=3.8"
+description = "A python package to analyze correlated ionic transport in amorphous solids."
+readme = "README.md"
+requires-python = ">=3.10"
 authors = [
   {name = "Vir Karan", email = "virkaran@berkeley.edu"},
 ]
-description = "A python package to analyze correlated ionic transport in amorphous solids."
-readme = "README.md"
+dependencies = [
+  "numpy",
+  "scipy",
+  "matplotlib",
+  "pandas",
+  "ase",
+  "pymatgen",
+  "pymatgen-analysis-diffusion",
+]
+
+[project.optional-dependencies]
+charge = ["chgnet"]
