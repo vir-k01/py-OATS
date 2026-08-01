@@ -19,7 +19,14 @@ dependencies = [
   "ase",
   "pymatgen",
   "pymatgen-analysis-diffusion",
+  "mp-api",
+  "matminer",
 ]
 
 [project.optional-dependencies]
 charge = ["chgnet"]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: requires external API access (skip with '-m \"not integration\"')",
+]
