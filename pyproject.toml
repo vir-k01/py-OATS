@@ -18,7 +18,7 @@ dependencies = [
   "pandas",
   "ase",
   "pymatgen",
-  "pymatgen-core"
+  "pymatgen-core",
   "pymatgen-analysis-diffusion",
   "mp-api",
   "matminer",
