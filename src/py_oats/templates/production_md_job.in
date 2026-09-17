@@ -1,0 +1,114 @@
+# ============================================================
+# Production MD workflow:
+#   1. Minimization
+#   2. NPT equilibration (with volume averaging over second half)
+#   3. Rescale box to average volume -> NVT equilibration
+#   4. Production NVT with per-type COM velocity tracking
+# ============================================================
+
+units           metal
+atom_style      atomic
+boundary        p p p
+
+read_data       input.data
+
+# -------------------------
+# Potential
+# -------------------------
+pair_style      ${pair_style}
+pair_coeff      * * ${potential_path} ${species_string}
+
+neighbor        2.0 bin
+neigh_modify    delay 0 every 1 check yes
+
+# -------------------------
+# Minimization
+# -------------------------
+dump            d_min all atom 1 minimized.dump
+min_style       cg
+minimize        1.0e-4 1.0e-6 10000 10000
+undump          d_min
+reset_timestep  0
+
+# -------------------------
+# Settings
+# -------------------------
+timestep        ${time_step}
+thermo          ${log_interval}
+thermo_style    custom step time temp press pe ke etotal vol density
+
+# -------------------------
+# Initial velocities
+# -------------------------
+velocity        all create ${temperature} ${seed} loop geom
+
+# ============================================================
+# Stage 1: NPT equilibration
+#   Run full NPT, average volume over the second half
+# ============================================================
+variable        nStepsEq equal ${eq_steps}
+variable        halfEq   equal round(${nStepsEq}/2)
+
+fix             f_npt all npt temp ${temperature} ${temperature} 0.1 iso 0.0 0.0 1.0
+
+dump            d_eq all custom ${dump_interval} eq_npt.dump id element x y z
+dump_modify     d_eq sort id element ${species_string}
+
+# Run first half (discard for averaging)
+run             ${halfEq}
+
+# Start volume averaging over second half
+variable        vol equal vol
+fix             f_avg_vol all ave/time 1 ${halfEq} ${halfEq} v_vol
+
+run             ${halfEq}
+
+# Capture the averaged volume
+variable        vol_avg_tmp equal f_f_avg_vol
+variable        vol_avg equal ${vol_avg_tmp}
+
+unfix           f_npt
+unfix           f_avg_vol
+undump          d_eq
+
+print           "NPT EQUILIBRATION: avg volume (2nd half) = ${vol_avg}"
+
+# ============================================================
+# Rescale box to match NPT average volume
+# ============================================================
+variable        vol_now equal vol
+variable        scale equal (${vol_avg}/${vol_now})^(1.0/3.0)
+print           "RESCALE: vol_now = ${vol_now}, vol_avg = ${vol_avg}, scale = ${scale}"
+change_box      all x scale ${scale} y scale ${scale} z scale ${scale} remap units box
+
+# ============================================================
+# Stage 2: NVT equilibration at fixed volume
+# ============================================================
+fix             f_nvt_eq all nvt temp ${temperature} ${temperature} 0.1
+
+dump            d_nvt_eq all custom ${dump_interval} eq_nvt.dump id element x y z
+dump_modify     d_nvt_eq sort id element ${species_string}
+
+run             ${nStepsEq}
+
+unfix           f_nvt_eq
+undump          d_nvt_eq
+
+# ============================================================
+# Stage 3: Production NVT
+# ============================================================
+reset_timestep  0
+
+fix             f_prod all nvt temp ${temperature} ${temperature} 0.1
+
+# Per-type COM velocity tracking
+compute         ch  all chunk/atom type
+compute         vcm all vcm/chunk ch
+fix             fvcm all print 1 ${vel_dump_cmd}
+
+dump            d_prod all custom ${dump_interval} production.dump id element x y z vx vy vz fx fy fz
+dump_modify     d_prod sort id element ${species_string}
+
+run             ${prod_steps}
+
+write_data      production_final.data
