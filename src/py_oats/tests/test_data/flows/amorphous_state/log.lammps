@@ -1,0 +1,631 @@
+LAMMPS (30 Mar 2026)
+# LAMMPS input generated from LammpsInputFile with pymatgen v2026.3.9
+
+# LAMMPS input generated from LammpsInputFile with pymatgen v2026.3.9
+
+# ============================================================
+# NVT (heat/cool ramps) -> NPT (20ps) -> conditional density handling
+# then production NVT (20ps, save 10 restarts) -> minimize each frame (10 times)
+# ------------------------------------------------------------
+# Condition:
+# Compare density just BEFORE NPT start (rho_init)
+# vs average density DURING NPT (rho_avg)
+# if |rho_avg-rho_init|/rho_init > 0.20:
+# run production NVT from the same initial structure (undo NPT)
+# else:
+# rescale NPT final structure to match rho_avg, then run production NVT
+# ============================================================
+
+# Stage 2
+units metal
+atom_style atomic
+boundary p p p
+
+# ------------------------- Structure -------------------------
+read_data input.data
+Reading data file ...
+  orthogonal box = (0 0 0) to (13.524926 13.524926 13.524926)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  102 atoms
+  read_data CPU = 0.002 seconds
+
+# ------------------------- GRACE potential -------------------------
+pair_style grace padding 0.05
+[GRACE] TF version: 2.16.2
+[GRACE] Neighbour padding is ON, padding fraction: 0.05, max padding fraction before reduction: 0.2, max number of reduction(s): 10
+pair_coeff * * /Users/virkaran/.cache/grace/GRACE-FS-OAM Li S
+[GRACE] Loading /Users/virkaran/.cache/grace/GRACE-FS-OAM
+[GRACE] Model loaded
+[GRACE] Mapping LAMMPS atom type #1(Li) -> ACE species type #39
+[GRACE] Mapping LAMMPS atom type #2(S) -> ACE species type #65
+
+# Stage 5
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+
+# ---- timestep (ps) ----
+timestep 0.001
+
+# ------------------------- Thermo output -------------------------
+thermo 1000
+thermo_style custom step time temp press pe ke etotal vol density
+thermo_modify flush yes
+
+# ------------------------- Targets / control -------------------------
+variable T equal 300.0
+variable P equal 0.0
+
+# Stage 9
+variable Tdamp equal 0.1
+variable Pdamp equal 1.0
+
+# Run lengths
+variable tNPT equal 0.5
+variable tNVT equal 0.5
+variable dt equal 0.001
+
+# Pre-ramp NVT steps (your original script used two 20ps segments)
+variable tRamp equal 0.5
+variable nStepsRamp equal round(${tRamp}/${dt})
+variable nStepsRamp equal round(0.5/${dt})
+variable nStepsRamp equal round(0.5/0.001)
+variable nStepsNPT equal round(${tNPT}/${dt})
+variable nStepsNPT equal round(0.5/${dt})
+variable nStepsNPT equal round(0.5/0.001)
+variable nStepsNVT equal round(${tNVT}/${dt})
+variable nStepsNVT equal round(0.5/${dt})
+variable nStepsNVT equal round(0.5/0.001)
+
+# ============================================================ Structure dumps (every N steps) for each fix phase ============================================================
+variable dumpfreq equal 1000
+
+# ============================================================ Pre-NVT ramps (kept from your script) ============================================================
+reset_timestep 0
+
+# ---- NVT ramp 1 dump ----
+dump d_nvt1 all custom ${dumpfreq} dump_nvt1.lammpstrj id element x y z
+dump d_nvt1 all custom 1000 dump_nvt1.lammpstrj id element x y z
+dump_modify d_nvt1 element Li S
+
+# Stage 15
+fix f_nvt_1 all nvt temp 5000.0 5000.0 ${Tdamp}
+fix f_nvt_1 all nvt temp 5000.0 5000.0 0.1
+run ${nStepsRamp}
+run 500
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 8
+  ghost atom cutoff = 8
+  binsize = 4, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair grace, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 3.097 | 3.097 | 3.097 Mbytes
+   Step          Time           Temp          Press          PotEng         KinEng         TotEng         Volume        Density    
+         0   0              0             -1061.087      -306.29447      0             -306.29447      2474.0285      1.048529     
+       500   0.5            5214.4356      28706.564     -315.77717      68.075889     -247.70128      2474.0285      1.048529     
+Loop time of 11.3834 on 1 procs for 500 steps with 102 atoms
+
+Performance: 3.795 ns/day, 6.324 hours/ns, 43.924 timesteps/s, 4.480 katom-step/s
+215.8% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 11.365     | 11.365     | 11.365     |   0.0 | 99.84
+Neigh   | 0.010186   | 0.010186   | 0.010186   |   0.0 |  0.09
+Comm    | 0.0030745  | 0.0030745  | 0.0030745  |   0.0 |  0.03
+Output  | 5.9833e-05 | 5.9833e-05 | 5.9833e-05 |   0.0 |  0.00
+Modify  | 0.0035828  | 0.0035828  | 0.0035828  |   0.0 |  0.03
+Other   |            | 0.001474   |            |       |  0.01
+
+Nlocal:            102 ave         102 max         102 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            952 ave         952 max         952 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         8878 ave        8878 max        8878 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 8878
+Ave neighs/atom = 87.039216
+Neighbor list builds = 32
+Dangerous builds = 0
+unfix f_nvt_1
+undump d_nvt1
+
+# ---- NVT ramp 2 dump ----
+dump d_nvt2 all custom ${dumpfreq} dump_nvt2.lammpstrj id element x y z
+dump d_nvt2 all custom 1000 dump_nvt2.lammpstrj id element x y z
+dump_modify d_nvt2 element Li S
+
+# Stage 17
+fix f_nvt_2 all nvt temp 5000.0 ${T} ${Tdamp}
+fix f_nvt_2 all nvt temp 5000.0 300 ${Tdamp}
+fix f_nvt_2 all nvt temp 5000.0 300 0.1
+run ${nStepsRamp}
+run 500
+Per MPI rank memory allocation (min/avg/max) = 3.101 | 3.101 | 3.101 Mbytes
+   Step          Time           Temp          Press          PotEng         KinEng         TotEng         Volume        Density    
+       500   0.5            5214.4356      28706.564     -315.77717      68.075889     -247.70128      2474.0285      1.048529     
+      1000   1              1449.6579     -15326.503     -348.8363       18.925682     -329.91062      2474.0285      1.048529     
+Loop time of 10.335 on 1 procs for 500 steps with 102 atoms
+
+Performance: 4.180 ns/day, 5.742 hours/ns, 48.379 timesteps/s, 4.935 katom-step/s
+221.8% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 10.318     | 10.318     | 10.318     |   0.0 | 99.83
+Neigh   | 0.0092837  | 0.0092837  | 0.0092837  |   0.0 |  0.09
+Comm    | 0.0028208  | 0.0028208  | 0.0028208  |   0.0 |  0.03
+Output  | 0.00052162 | 0.00052162 | 0.00052162 |   0.0 |  0.01
+Modify  | 0.0032417  | 0.0032417  | 0.0032417  |   0.0 |  0.03
+Other   |            | 0.001368   |            |       |  0.01
+
+Nlocal:            102 ave         102 max         102 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            928 ave         928 max         928 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         8938 ave        8938 max        8938 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 8938
+Ave neighs/atom = 87.627451
+Neighbor list builds = 33
+Dangerous builds = 0
+unfix f_nvt_2
+undump d_nvt2
+
+# ============================================================ Density check setup: save structure BEFORE NPT ============================================================
+variable rho_init equal density
+variable rho_init0 equal ${rho_init} # <-- freeze numeric value
+variable rho_init0 equal 1.04852899391073 
+print "DENSITY CHECK: rho_init0 (before NPT) = ${rho_init0}"
+DENSITY CHECK: rho_init0 (before NPT) = 1.04852899391073
+
+# Stage 19
+write_restart npt_initial_structure.rst
+System init for write_restart ...
+
+# ============================================================ NPT with averaging of density over the full NPT run ============================================================
+variable rho equal density
+
+# Stage 21
+fix avg_rho all ave/time 1 ${nStepsNPT} ${nStepsNPT} v_rho
+fix avg_rho all ave/time 1 500 ${nStepsNPT} v_rho
+fix avg_rho all ave/time 1 500 500 v_rho
+
+# ---- NPT dump ----
+dump d_npt all custom ${dumpfreq} dump_npt.lammpstrj id element x y z
+dump d_npt all custom 1000 dump_npt.lammpstrj id element x y z
+dump_modify d_npt element Li S
+
+# Stage 23
+fix f_npt all npt temp ${T} ${T} ${Tdamp} iso ${P} ${P} ${Pdamp}
+fix f_npt all npt temp 300 ${T} ${Tdamp} iso ${P} ${P} ${Pdamp}
+fix f_npt all npt temp 300 300 ${Tdamp} iso ${P} ${P} ${Pdamp}
+fix f_npt all npt temp 300 300 0.1 iso ${P} ${P} ${Pdamp}
+fix f_npt all npt temp 300 300 0.1 iso 0 ${P} ${Pdamp}
+fix f_npt all npt temp 300 300 0.1 iso 0 0 ${Pdamp}
+fix f_npt all npt temp 300 300 0.1 iso 0 0 1
+run ${nStepsNPT}
+run 500
+Per MPI rank memory allocation (min/avg/max) = 3.101 | 3.101 | 3.101 Mbytes
+   Step          Time           Temp          Press          PotEng         KinEng         TotEng         Volume        Density    
+      1000   1              1449.6579     -15326.503     -348.8363       18.925682     -329.91062      2474.0285      1.048529     
+      1500   1.5            279.08932      351.7245      -381.41256      3.6435877     -377.76897      1817.9457      1.4269351    
+Loop time of 15.8934 on 1 procs for 500 steps with 102 atoms
+
+Performance: 2.718 ns/day, 8.830 hours/ns, 31.460 timesteps/s, 3.209 katom-step/s
+189.3% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 15.877     | 15.877     | 15.877     |   0.0 | 99.89
+Neigh   | 0.0034033  | 0.0034033  | 0.0034033  |   0.0 |  0.02
+Comm    | 0.0024472  | 0.0024472  | 0.0024472  |   0.0 |  0.02
+Output  | 0.0016628  | 0.0016628  | 0.0016628  |   0.0 |  0.01
+Modify  | 0.0083194  | 0.0083194  | 0.0083194  |   0.0 |  0.05
+Other   |            | 0.001068   |            |       |  0.01
+
+Nlocal:            102 ave         102 max         102 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:           1151 ave        1151 max        1151 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:        12058 ave       12058 max       12058 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 12058
+Ave neighs/atom = 118.21569
+Neighbor list builds = 14
+Dangerous builds = 0
+
+# dump no longer needed after the NPT run
+undump d_npt
+
+# ---- capture averages/end values while fixes still exist ----
+variable rho_avg_tmp equal f_avg_rho
+variable rho_avg equal ${rho_avg_tmp} # <-- freeze
+variable rho_avg equal 1.29624476357482 
+variable rho_end equal density # for printing only
+
+# Stage 26
+unfix f_npt
+unfix avg_rho
+
+# Correct comparison: avg during NPT vs pre-NPT density
+variable rho_frac_change equal abs(${rho_avg}-${rho_init0})/${rho_init0}
+variable rho_frac_change equal abs(1.29624476357482-${rho_init0})/${rho_init0}
+variable rho_frac_change equal abs(1.29624476357482-1.04852899391073)/${rho_init0}
+variable rho_frac_change equal abs(1.29624476357482-1.04852899391073)/1.04852899391073
+
+# Stage 28
+print "DENSITY CHECK: rho_avg (during NPT) = ${rho_avg}"
+DENSITY CHECK: rho_avg (during NPT) = 1.29624476357482
+print "DENSITY CHECK: rho_end (after NPT) = ${rho_end} (for info only)"
+DENSITY CHECK: rho_end (after NPT) = 1.42693513711266 (for info only)
+print "DENSITY CHECK: frac change (avg vs pre) = ${rho_frac_change}"
+DENSITY CHECK: frac change (avg vs pre) = 0.236250758064569
+
+# ============================================================ Branch based on 30% threshold ============================================================
+variable use_initial equal ( ${rho_frac_change} > 0.3 )
+variable use_initial equal ( 0.236250758064569 > 0.3 )
+
+# Stage 30
+if "${use_initial} == 1" then "jump SELF density_restore_initial"
+jump SELF density_use_avg
+print "DENSITY CHECK: change <= threshold -> rescaling NPT final structure to rho_avg for production NVT."
+DENSITY CHECK: change <= threshold -> rescaling NPT final structure to rho_avg for production NVT.
+
+# Stage 37 rescale box so density becomes rho_avg
+variable rho_now equal density
+variable s equal ( ${rho_now}/${rho_avg} )^(1.0/3.0)
+variable s equal ( 1.42693513711266/${rho_avg} )^(1.0/3.0)
+variable s equal ( 1.42693513711266/1.29624476357482 )^(1.0/3.0)
+
+# Stage 38
+print "DENSITY CHECK: rescale factor s = ${s}"
+DENSITY CHECK: rescale factor s = 1.03253727564394
+change_box all x scale ${s} y scale ${s} z scale ${s} remap units box
+change_box all x scale 1.03253727564394 y scale ${s} z scale ${s} remap units box
+change_box all x scale 1.03253727564394 y scale 1.03253727564394 z scale ${s} remap units box
+change_box all x scale 1.03253727564394 y scale 1.03253727564394 z scale 1.03253727564394 remap units box
+Changing box ...
+  orthogonal box = (0.46156119 0.66011497 0.66011497) to (13.063365 12.864811 12.864811)
+  orthogonal box = (0.46156119 0.46156119 0.66011497) to (13.063365 13.063365 12.864811)
+  orthogonal box = (0.46156119 0.46156119 0.46156119) to (13.063365 13.063365 13.063365)
+
+# Stage 39
+jump SELF density_start_production
+
+# Stage 41
+fix f_nvt all nvt temp ${T} ${T} ${Tdamp}
+fix f_nvt all nvt temp 300 ${T} ${Tdamp}
+fix f_nvt all nvt temp 300 300 ${Tdamp}
+fix f_nvt all nvt temp 300 300 0.1
+
+# ---- production NVT dump ----
+dump d_prod all custom ${dumpfreq} dump_prod_nvt.lammpstrj id element x y z
+dump d_prod all custom 1000 dump_prod_nvt.lammpstrj id element x y z
+dump_modify d_prod element Li S
+
+# Stage 43
+variable nFrames equal 2
+variable segSteps equal round(${nStepsNVT}/${nFrames})
+variable segSteps equal round(500/${nFrames})
+variable segSteps equal round(500/2)
+
+# Stage 44
+variable rstPrefix string nvt_frame_
+
+# Stage 45
+variable frame loop ${nFrames}
+variable frame loop 2
+label loop_save
+run ${segSteps}
+run 250
+Per MPI rank memory allocation (min/avg/max) = 3.102 | 3.102 | 3.102 Mbytes
+   Step          Time           Temp          Press          PotEng         KinEng         TotEng         Volume        Density    
+      1500   1.5            279.08932     -26491.656     -379.58384      3.6435877     -375.94026      2001.2351      1.2962448    
+      1750   1.75           322.10093     -17409.511     -381.25564      4.2051161     -377.05052      2001.2351      1.2962448    
+Loop time of 5.13015 on 1 procs for 250 steps with 102 atoms
+
+Performance: 4.210 ns/day, 5.700 hours/ns, 48.732 timesteps/s, 4.971 katom-step/s
+235.1% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 5.1258     | 5.1258     | 5.1258     |   0.0 | 99.92
+Neigh   | 0.00096654 | 0.00096654 | 0.00096654 |   0.0 |  0.02
+Comm    | 0.0011703  | 0.0011703  | 0.0011703  |   0.0 |  0.02
+Output  | 5.7125e-05 | 5.7125e-05 | 5.7125e-05 |   0.0 |  0.00
+Modify  | 0.0014446  | 0.0014446  | 0.0014446  |   0.0 |  0.03
+Other   |            | 0.0006647  |            |       |  0.01
+
+Nlocal:            102 ave         102 max         102 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:           1080 ave        1080 max        1080 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:        11046 ave       11046 max       11046 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 11046
+Ave neighs/atom = 108.29412
+Neighbor list builds = 4
+Dangerous builds = 0
+write_restart ${rstPrefix}${frame}.restart
+write_restart nvt_frame_${frame}.restart
+write_restart nvt_frame_1.restart
+System init for write_restart ...
+next frame
+jump SELF loop_save
+run ${segSteps}
+run 250
+Per MPI rank memory allocation (min/avg/max) = 3.102 | 3.102 | 3.102 Mbytes
+   Step          Time           Temp          Press          PotEng         KinEng         TotEng         Volume        Density    
+      1750   1.75           322.10093     -17409.511     -381.25564      4.2051161     -377.05052      2001.2351      1.2962448    
+      2000   2              280.51256     -14085.468     -381.24829      3.6621685     -377.58612      2001.2351      1.2962448    
+Loop time of 5.09556 on 1 procs for 250 steps with 102 atoms
+
+Performance: 4.239 ns/day, 5.662 hours/ns, 49.062 timesteps/s, 5.004 katom-step/s
+235.8% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 5.0912     | 5.0912     | 5.0912     |   0.0 | 99.91
+Neigh   | 0.00095592 | 0.00095592 | 0.00095592 |   0.0 |  0.02
+Comm    | 0.0011584  | 0.0011584  | 0.0011584  |   0.0 |  0.02
+Output  | 0.00018942 | 0.00018942 | 0.00018942 |   0.0 |  0.00
+Modify  | 0.0014335  | 0.0014335  | 0.0014335  |   0.0 |  0.03
+Other   |            | 0.0006585  |            |       |  0.01
+
+Nlocal:            102 ave         102 max         102 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:           1061 ave        1061 max        1061 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:        11030 ave       11030 max       11030 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 11030
+Ave neighs/atom = 108.13725
+Neighbor list builds = 4
+Dangerous builds = 0
+write_restart ${rstPrefix}${frame}.restart
+write_restart nvt_frame_${frame}.restart
+write_restart nvt_frame_2.restart
+System init for write_restart ...
+next frame
+jump SELF loop_save
+
+# stop production dump + fix after loop finishes
+undump d_prod
+unfix f_nvt
+
+# ============================================================ Minimize each saved NVT frame (10 times) ============================================================
+variable Etol equal 1e-10
+variable Ftol equal 1e-10
+variable MaxIter equal 20000
+variable MaxEval equal 200000
+
+# Stage 48
+min_style cg
+
+# Stage 49
+variable frame2 loop ${nFrames}
+variable frame2 loop 2
+label loop_min
+clear
+[grace] 203898 atoms, 1999 calls, 102.0 atoms/step, 205.9 us/atom | Data: 1.0%, Model: 99.0%
+read_restart ${rstPrefix}${frame2}.restart
+read_restart nvt_frame_${frame2}.restart
+read_restart nvt_frame_1.restart
+Reading restart file ...
+  restart file = 30 Mar 2026, LAMMPS = 30 Mar 2026
+  restoring atom style atomic from restart
+  orthogonal box = (0.46156119 0.46156119 0.46156119) to (13.063365 13.063365 13.063365)
+  1 by 1 by 1 MPI processor grid
+  pair style grace stores no restart info
+  102 atoms
+  read_restart CPU = 0.000 seconds
+
+# Stage 50
+pair_style grace padding 0.05
+[GRACE] TF version: 2.16.2
+[GRACE] Neighbour padding is ON, padding fraction: 0.05, max padding fraction before reduction: 0.2, max number of reduction(s): 10
+pair_coeff * * /Users/virkaran/.cache/grace/GRACE-FS-OAM Li S
+[GRACE] Loading /Users/virkaran/.cache/grace/GRACE-FS-OAM
+[GRACE] Model loaded
+[GRACE] Mapping LAMMPS atom type #1(Li) -> ACE species type #39
+[GRACE] Mapping LAMMPS atom type #2(S) -> ACE species type #65
+
+# Stage 51
+thermo 1000
+thermo_style custom step time temp press pe ke etotal vol density
+thermo_modify flush yes
+
+# Stage 52
+reset_timestep 0
+minimize ${Etol} ${Ftol} ${MaxIter} ${MaxEval}
+minimize 1e-10 ${Ftol} ${MaxIter} ${MaxEval}
+minimize 1e-10 1e-10 ${MaxIter} ${MaxEval}
+minimize 1e-10 1e-10 20000 ${MaxEval}
+minimize 1e-10 1e-10 20000 200000
+Unused restart file global fix info:
+  fix style: nvt, fix ID: f_nvt
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 8
+  ghost atom cutoff = 8
+  binsize = 4, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair grace, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 4.232 | 4.232 | 4.232 Mbytes
+   Step          Time           Temp          Press          PotEng         KinEng         TotEng         Volume        Density    
+         0   0              322.10093     -17409.511     -381.25564      4.2051161     -377.05052      2001.2351      1.2962448    
+       109   0.109          322.10093     -14981.129     -386.20758      4.2051161     -382.00247      2001.2351      1.2962448    
+Loop time of 4.17019 on 1 procs for 109 steps with 102 atoms
+
+234.5% CPU use with 1 MPI tasks x no OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+     -381.255638274764   -386.20758468376  -386.207584716713
+  Force two-norm initial, final = 3.9067854 0.00037431329
+  Force max component initial, final = 0.66678676 0.00010061759
+  Final line search alpha, max atom move = 1 0.00010061759
+  Iterations, force evaluations = 109 196
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 4.1675     | 4.1675     | 4.1675     |   0.0 | 99.93
+Neigh   | 0.00046629 | 0.00046629 | 0.00046629 |   0.0 |  0.01
+Comm    | 0.0008853  | 0.0008853  | 0.0008853  |   0.0 |  0.02
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.001383   |            |       |  0.03
+
+Nlocal:            102 ave         102 max         102 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:           1043 ave        1043 max        1043 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:        10984 ave       10984 max       10984 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 10984
+Ave neighs/atom = 107.68627
+Neighbor list builds = 2
+Dangerous builds = 0
+
+# Stage 53
+write_data minimized_nvt_frame_${frame2}.data
+write_data minimized_nvt_frame_1.data
+System init for write_data ...
+next frame2
+jump SELF loop_min
+clear
+[grace] 20094 atoms, 197 calls, 102.0 atoms/step, 207.3 us/atom | Data: 0.9%, Model: 99.1%
+read_restart ${rstPrefix}${frame2}.restart
+read_restart nvt_frame_${frame2}.restart
+read_restart nvt_frame_2.restart
+Reading restart file ...
+  restart file = 30 Mar 2026, LAMMPS = 30 Mar 2026
+  restoring atom style atomic from restart
+  orthogonal box = (0.46156119 0.46156119 0.46156119) to (13.063365 13.063365 13.063365)
+  1 by 1 by 1 MPI processor grid
+  pair style grace stores no restart info
+  102 atoms
+  read_restart CPU = 0.000 seconds
+
+# Stage 50
+pair_style grace padding 0.05
+[GRACE] TF version: 2.16.2
+[GRACE] Neighbour padding is ON, padding fraction: 0.05, max padding fraction before reduction: 0.2, max number of reduction(s): 10
+pair_coeff * * /Users/virkaran/.cache/grace/GRACE-FS-OAM Li S
+[GRACE] Loading /Users/virkaran/.cache/grace/GRACE-FS-OAM
+[GRACE] Model loaded
+[GRACE] Mapping LAMMPS atom type #1(Li) -> ACE species type #39
+[GRACE] Mapping LAMMPS atom type #2(S) -> ACE species type #65
+
+# Stage 51
+thermo 1000
+thermo_style custom step time temp press pe ke etotal vol density
+thermo_modify flush yes
+
+# Stage 52
+reset_timestep 0
+minimize ${Etol} ${Ftol} ${MaxIter} ${MaxEval}
+minimize 1e-10 ${Ftol} ${MaxIter} ${MaxEval}
+minimize 1e-10 1e-10 ${MaxIter} ${MaxEval}
+minimize 1e-10 1e-10 20000 ${MaxEval}
+minimize 1e-10 1e-10 20000 200000
+Unused restart file global fix info:
+  fix style: nvt, fix ID: f_nvt
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 8
+  ghost atom cutoff = 8
+  binsize = 4, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair grace, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 4.23 | 4.23 | 4.23 Mbytes
+   Step          Time           Temp          Press          PotEng         KinEng         TotEng         Volume        Density    
+         0   0              280.51256     -14085.468     -381.24829      3.6621685     -377.58612      2001.2351      1.2962448    
+       107   0.107          280.51256     -17056.997     -385.60121      3.6621685     -381.93904      2001.2351      1.2962448    
+Loop time of 4.21289 on 1 procs for 107 steps with 102 atoms
+
+233.6% CPU use with 1 MPI tasks x no OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+     -381.248288619766  -385.601212071938  -385.601212107029
+  Force two-norm initial, final = 4.7288265 0.00034206334
+  Force max component initial, final = 0.94123106 6.6903023e-05
+  Final line search alpha, max atom move = 1 6.6903023e-05
+  Iterations, force evaluations = 107 199
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 4.2103     | 4.2103     | 4.2103     |   0.0 | 99.94
+Neigh   | 0.000235   | 0.000235   | 0.000235   |   0.0 |  0.01
+Comm    | 0.00090496 | 0.00090496 | 0.00090496 |   0.0 |  0.02
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.001438   |            |       |  0.03
+
+Nlocal:            102 ave         102 max         102 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:           1061 ave        1061 max        1061 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:        10970 ave       10970 max       10970 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 10970
+Ave neighs/atom = 107.54902
+Neighbor list builds = 1
+Dangerous builds = 0
+
+# Stage 53
+write_data minimized_nvt_frame_${frame2}.data
+write_data minimized_nvt_frame_2.data
+System init for write_data ...
+next frame2
+jump SELF loop_min
+[grace] 20400 atoms, 200 calls, 102.0 atoms/step, 206.3 us/atom | Data: 0.9%, Model: 99.1%
+Total wall time: 0:01:05

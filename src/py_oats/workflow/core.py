@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -8,62 +7,19 @@ from jobflow import Flow, Maker, job
 from pymatgen.core import Composition, Structure
 
 from atomate2.lammps.jobs.core import CustomLammpsMaker
+from atomate2.lammps.schemas.task import StoreTrajectoryOption
 from py_oats.analyzers.base import BaseAnalyzer
 from py_oats.analyzers.transport import TransportAnalyzer
 from py_oats.io.trajectory import TrajectoryData
 from py_oats.structure_generator.generator import get_amorphous_structure
-from atomate2.lammps.schemas.task import StoreTrajectoryOption
-
-
-TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
-
-_AMORPHOUS_STATE_DEFAULTS: dict = {
-    "atom_style": "atomic",
-    "potential_path": str(Path.home() / ".cache/grace/GRACE-FS-OAM"),
-    "temperature": 300.0,
-    "pressure": 0.0,
-    "time_step": 0.001,
-    "t_damp": 0.1,
-    "p_damp": 1.0,
-    "t_npt": 20.0,
-    "t_nvt": 20.0,
-    "t_ramp": 20.0,
-    "ramp_temperature": 5000.0,
-    "thermo_interval": 1000,
-    "dump_interval": 1000,
-    "density_threshold": 0.30,
-    "n_frames": 10,
-    "e_tol": 1.0e-10,
-    "f_tol": 1.0e-10,
-    "max_iter": 20000,
-    "max_eval": 200000,
-}
-
-
-_PRODUCTION_MD_DEFAULTS: dict = {
-    "atom_style": "atomic",
-    "pair_style": "grace",
-    "potential_path": str(Path.home() / ".cache/grace/GRACE-FS-OAM"),
-    "temperature": 300.0,
-    "time_step": 0.001,
-    "log_interval": 100,
-    "dump_interval": 1000,
-    "eq_steps": 50000,
-    "prod_steps": 10000000,
-    "seed": 12345,
-}
-
-
-def _species_string(structure: Structure) -> str:
-    """Return a space-separated species string preserving element order."""
-    seen: set[str] = set()
-    species: list[str] = []
-    for site in structure:
-        sym = site.specie.symbol
-        if sym not in seen:
-            seen.add(sym)
-            species.append(sym)
-    return " ".join(species)
+from py_oats.utils.workflow.helpers import (
+    TEMPLATE_DIR,
+    _AMORPHOUS_STATE_DEFAULTS,
+    _ANALYZER_TO_SCHEMA,
+    _PRODUCTION_MD_DEFAULTS,
+    _find_trajectory_file,
+    _species_string,
+)
 
 
 @dataclass
@@ -71,7 +27,7 @@ class AmorphousStateMaker(CustomLammpsMaker):
     """
     A ``CustomLammpsMaker`` that generates an amorphous structure from a
     composition and uses LAMMPS with a fast GRACE-FS potential to equilibrate it
-    and a bigger GRACE-3L potential to relax it a local minimum (keeping a cubic cell). 
+    and a bigger GRACE-3L potential to relax it a local minimum (keeping a cubic cell).
     This is akin to generating the structures to use for ``amorphous limit'' calculations.
     The output structures of this job can be used as inputs for other MD jobs as well.
     """
@@ -139,16 +95,28 @@ class AnalysisMaker(Maker):
     analyzers: list[type[BaseAnalyzer]] = field(
         default_factory=lambda: [TransportAnalyzer]
     )
+    temperature: float = 300.0
+    time_step: float = 0.001
+    dump_interval: int = 1000
 
     @job
-    def make(self, run_dir: str, **kwargs):
-        trajectory_file = os.path.join(run_dir, "production.dump")
-        data = TrajectoryData.from_file(trajectory_file)
+    def make(self, run_dir: str):
+        trajectory_file = _find_trajectory_file(run_dir)
+        data = TrajectoryData.read(
+            trajectory_file,
+            temperature=self.temperature,
+            time_step=self.time_step,
+            step_skip=self.dump_interval,
+        )
         docs = []
         for analyzer_cls in self.analyzers:
             analyzer_instance = analyzer_cls(data)
-            analyzer_instance.analyze(**kwargs)
-            doc = analyzer_instance.to_doc()
+            analyzer_instance.analyze()
+            schema_cls = _ANALYZER_TO_SCHEMA.get(analyzer_cls)
+            if schema_cls is not None and hasattr(schema_cls, "from_analyzer"):
+                doc = schema_cls.from_analyzer(analyzer_instance)
+            else:
+                doc = {"analyzer": analyzer_cls.__name__, "species": list(data.unique_species)}
             docs.append(doc)
         return docs
 
@@ -161,6 +129,18 @@ class ProductionOnsagerMaker(Maker):
         default_factory=ProductionMDMaker
     )
     analysis_maker: AnalysisMaker = field(default_factory=AnalysisMaker)
+
+    def __post_init__(self):
+        md_settings = self.production_md_maker.settings
+        self.analysis_maker.temperature = md_settings.get(
+            "temperature", self.analysis_maker.temperature
+        )
+        self.analysis_maker.time_step = md_settings.get(
+            "time_step", self.analysis_maker.time_step
+        )
+        self.analysis_maker.dump_interval = md_settings.get(
+            "dump_interval", self.analysis_maker.dump_interval
+        )
 
     def make(self, structure_or_composition: Structure | Composition, **kwargs):
         jobs = []

@@ -50,8 +50,8 @@ class TransportAnalyzer(BaseAnalyzer):
         self.mapping = {s: i for i, s in enumerate(self.species)}
         self.inv_mapping = {i: s for i, s in enumerate(self.species)}
 
-        self.times = self.time_step * np.linspace(
-            0, self.traj_length * self.step_skip, self.traj_length, dtype=np.float64
+        self.times = self.time_step * self.step_skip * np.arange(
+            self.traj_length, dtype=np.float64
         )
         self.kbT = 8.617333262e-5 * self.temperature * 10.0  # eV/atom, A^2/fs -> cm^2/s
         vol_ang3 = np.mean(
@@ -130,9 +130,12 @@ class TransportAnalyzer(BaseAnalyzer):
         return self.L_tensor - self.L_tensor_self
 
     def get_diffusivity(self, specie: str | int) -> float:
-        """Get the Einstein self-diffusion coefficient for a given species in cm^2/s"""
+        """Get the Einstein self-diffusion coefficient for a given species in cm^2/s.
+
+        D_i = kBT * L_ii_self / N_i
+        """
         if isinstance(specie, str):
             specie = self.mapping[specie]
-        
+
         specie_amount = len(self.trajectory.species[self.trajectory.species == self.inv_mapping[specie]])
-        return self.L_tensor_self[specie, specie].copy() / specie_amount
+        return self.kbT * self.L_tensor_self[specie, specie] / specie_amount

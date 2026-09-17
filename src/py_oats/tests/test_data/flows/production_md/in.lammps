@@ -1,0 +1,116 @@
+# LAMMPS input generated from LammpsInputFile with pymatgen v2026.3.9
+
+# LAMMPS input generated from LammpsInputFile with pymatgen v2026.3.9
+
+# ============================================================
+# Production MD workflow:
+# 1. Minimization
+# 2. NPT equilibration (with volume averaging over second half)
+# 3. Rescale box to average volume -> NVT equilibration
+# 4. Production NVT with per-type COM velocity tracking
+# ============================================================
+
+# Stage 2
+units metal
+atom_style atomic
+boundary p p p
+
+# Stage 3
+read_data input.data
+
+# ------------------------- Potential -------------------------
+pair_style grace
+pair_coeff * * /Users/virkaran/.cache/grace/GRACE-FS-OAM Li S
+
+# Stage 5
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+
+# ------------------------- Minimization -------------------------
+dump d_min all atom 1 minimized.dump
+min_style cg
+minimize 1.0e-4 1.0e-6 10000 10000
+undump d_min
+reset_timestep 0
+
+# ------------------------- Settings -------------------------
+timestep 0.001
+thermo 100
+thermo_style custom step time temp press pe ke etotal vol density
+
+# ------------------------- Initial velocities -------------------------
+velocity all create 1000.0 12345 loop geom
+
+# ============================================================ Stage 1: NPT equilibration Run full NPT, average volume over the second half ============================================================
+variable nStepsEq equal 500
+variable halfEq equal round(${nStepsEq}/2)
+
+# Stage 10
+fix f_npt all npt temp 1000.0 1000.0 0.1 iso 0.0 0.0 1.0
+
+# Stage 11
+dump d_eq all custom 100 eq_npt.dump id element x y z
+dump_modify d_eq sort id element Li S
+
+# Run first half (discard for averaging)
+run ${halfEq}
+
+# Start volume averaging over second half
+variable vol equal vol
+fix f_avg_vol all ave/time 1 ${halfEq} ${halfEq} v_vol
+
+# Stage 14
+run ${halfEq}
+
+# Capture the averaged volume
+variable vol_avg_tmp equal f_f_avg_vol
+variable vol_avg equal ${vol_avg_tmp}
+
+# Stage 16
+unfix f_npt
+unfix f_avg_vol
+undump d_eq
+
+# Stage 17
+print "NPT EQUILIBRATION: avg volume (2nd half) = ${vol_avg}"
+
+# ============================================================ Rescale box to match NPT average volume ============================================================
+variable vol_now equal vol
+variable scale equal (${vol_avg}/${vol_now})^(1.0/3.0)
+print "RESCALE: vol_now = ${vol_now}, vol_avg = ${vol_avg}, scale = ${scale}"
+change_box all x scale ${scale} y scale ${scale} z scale ${scale} remap units box
+
+# ============================================================ Stage 2: NVT equilibration at fixed volume ============================================================
+fix f_nvt_eq all nvt temp 1000.0 1000.0 0.1
+
+# Stage 20
+dump d_nvt_eq all custom 100 eq_nvt.dump id element x y z
+dump_modify d_nvt_eq sort id element Li S
+
+# Stage 21
+run ${nStepsEq}
+
+# Stage 22
+unfix f_nvt_eq
+undump d_nvt_eq
+
+# ============================================================ Stage 3: Production NVT ============================================================
+reset_timestep 0
+
+# Stage 24
+fix f_prod all nvt temp 1000.0 1000.0 0.1
+
+# Per-type COM velocity tracking
+compute ch all chunk/atom type
+compute vcm all vcm/chunk ch
+fix fvcm all print 1 "$(step) $(c_vcm[1][1]) $(c_vcm[1][2]) $(c_vcm[1][3]) $(c_vcm[2][1]) $(c_vcm[2][2]) $(c_vcm[2][3])" file species_vcm.dat screen no title "# step Li_vx Li_vy Li_vz S_vx S_vy S_vz"
+
+# Stage 26
+dump d_prod all custom 100 production.dump id element x y z vx vy vz fx fy fz
+dump_modify d_prod sort id element Li S
+
+# Stage 27
+run 1000
+
+# Stage 28
+write_data production_final.data

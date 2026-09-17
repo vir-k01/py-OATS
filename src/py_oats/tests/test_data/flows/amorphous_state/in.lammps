@@ -1,0 +1,231 @@
+# LAMMPS input generated from LammpsInputFile with pymatgen v2026.3.9
+
+# LAMMPS input generated from LammpsInputFile with pymatgen v2026.3.9
+
+# ============================================================
+# NVT (heat/cool ramps) -> NPT (20ps) -> conditional density handling
+# then production NVT (20ps, save 10 restarts) -> minimize each frame (10 times)
+# ------------------------------------------------------------
+# Condition:
+# Compare density just BEFORE NPT start (rho_init)
+# vs average density DURING NPT (rho_avg)
+# if |rho_avg-rho_init|/rho_init > 0.20:
+# run production NVT from the same initial structure (undo NPT)
+# else:
+# rescale NPT final structure to match rho_avg, then run production NVT
+# ============================================================
+
+# Stage 2
+units metal
+atom_style atomic
+boundary p p p
+
+# ------------------------- Structure -------------------------
+read_data input.data
+
+# ------------------------- GRACE potential -------------------------
+pair_style grace padding 0.05
+pair_coeff * * /Users/virkaran/.cache/grace/GRACE-FS-OAM Li S
+
+# Stage 5
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+
+# ---- timestep (ps) ----
+timestep 0.001
+
+# ------------------------- Thermo output -------------------------
+thermo 1000
+thermo_style custom step time temp press pe ke etotal vol density
+thermo_modify flush yes
+
+# ------------------------- Targets / control -------------------------
+variable T equal 300.0
+variable P equal 0.0
+
+# Stage 9
+variable Tdamp equal 0.1
+variable Pdamp equal 1.0
+
+# Run lengths
+variable tNPT equal 0.5
+variable tNVT equal 0.5
+variable dt equal 0.001
+
+# Pre-ramp NVT steps (your original script used two 20ps segments)
+variable tRamp equal 0.5
+variable nStepsRamp equal round(${tRamp}/${dt})
+variable nStepsNPT equal round(${tNPT}/${dt})
+variable nStepsNVT equal round(${tNVT}/${dt})
+
+# ============================================================ Structure dumps (every N steps) for each fix phase ============================================================
+variable dumpfreq equal 1000
+
+# ============================================================ Pre-NVT ramps (kept from your script) ============================================================
+reset_timestep 0
+
+# ---- NVT ramp 1 dump ----
+dump d_nvt1 all custom ${dumpfreq} dump_nvt1.lammpstrj id element x y z
+dump_modify d_nvt1 element Li S
+
+# Stage 15
+fix f_nvt_1 all nvt temp 5000.0 5000.0 ${Tdamp}
+run ${nStepsRamp}
+unfix f_nvt_1
+undump d_nvt1
+
+# ---- NVT ramp 2 dump ----
+dump d_nvt2 all custom ${dumpfreq} dump_nvt2.lammpstrj id element x y z
+dump_modify d_nvt2 element Li S
+
+# Stage 17
+fix f_nvt_2 all nvt temp 5000.0 ${T} ${Tdamp}
+run ${nStepsRamp}
+unfix f_nvt_2
+undump d_nvt2
+
+# ============================================================ Density check setup: save structure BEFORE NPT ============================================================
+variable rho_init equal density
+variable rho_init0 equal ${rho_init} # <-- freeze numeric value
+print "DENSITY CHECK: rho_init0 (before NPT) = ${rho_init0}"
+
+# Stage 19
+write_restart npt_initial_structure.rst
+
+# ============================================================ NPT with averaging of density over the full NPT run ============================================================
+variable rho equal density
+
+# Stage 21
+fix avg_rho all ave/time 1 ${nStepsNPT} ${nStepsNPT} v_rho
+
+# ---- NPT dump ----
+dump d_npt all custom ${dumpfreq} dump_npt.lammpstrj id element x y z
+dump_modify d_npt element Li S
+
+# Stage 23
+fix f_npt all npt temp ${T} ${T} ${Tdamp} iso ${P} ${P} ${Pdamp}
+run ${nStepsNPT}
+
+# dump no longer needed after the NPT run
+undump d_npt
+
+# ---- capture averages/end values while fixes still exist ----
+variable rho_avg_tmp equal f_avg_rho
+variable rho_avg equal ${rho_avg_tmp} # <-- freeze
+variable rho_end equal density # for printing only
+
+# Stage 26
+unfix f_npt
+unfix avg_rho
+
+# Correct comparison: avg during NPT vs pre-NPT density
+variable rho_frac_change equal abs(${rho_avg}-${rho_init0})/${rho_init0}
+
+# Stage 28
+print "DENSITY CHECK: rho_avg (during NPT) = ${rho_avg}"
+print "DENSITY CHECK: rho_end (after NPT) = ${rho_end} (for info only)"
+print "DENSITY CHECK: frac change (avg vs pre) = ${rho_frac_change}"
+
+# ============================================================ Branch based on 30% threshold ============================================================
+variable use_initial equal ( ${rho_frac_change} > 0.3 )
+
+# Stage 30
+if "${use_initial} == 1" then "jump SELF density_restore_initial"
+jump SELF density_use_avg
+
+# Stage 31
+label density_restore_initial
+print "DENSITY CHECK: change > threshold -> restoring structure BEFORE NPT for production NVT."
+
+# Stage 32
+clear 
+read_restart npt_initial_structure.rst
+
+# Stage 33 Pair style/coeff and thermo required after clear
+pair_style grace padding 0.05
+pair_coeff * * /Users/virkaran/.cache/grace/GRACE-FS-OAM Li S
+
+# Stage 34
+thermo 1000
+thermo_style custom step time temp press pe ke etotal vol density
+thermo_modify flush yes
+
+# Stage 35
+jump SELF density_start_production
+
+# Stage 36
+label density_use_avg
+print "DENSITY CHECK: change <= threshold -> rescaling NPT final structure to rho_avg for production NVT."
+
+# Stage 37 rescale box so density becomes rho_avg
+variable rho_now equal density
+variable s equal ( ${rho_now}/${rho_avg} )^(1.0/3.0)
+
+# Stage 38
+print "DENSITY CHECK: rescale factor s = ${s}"
+change_box all x scale ${s} y scale ${s} z scale ${s} remap units box
+
+# Stage 39
+jump SELF density_start_production
+
+# ============================================================ Production NVT: save 10 restarts ============================================================
+label density_start_production
+
+# Stage 41
+fix f_nvt all nvt temp ${T} ${T} ${Tdamp}
+
+# ---- production NVT dump ----
+dump d_prod all custom ${dumpfreq} dump_prod_nvt.lammpstrj id element x y z
+dump_modify d_prod element Li S
+
+# Stage 43
+variable nFrames equal 2
+variable segSteps equal round(${nStepsNVT}/${nFrames})
+
+# Stage 44
+variable rstPrefix string nvt_frame_
+
+# Stage 45
+variable frame loop ${nFrames}
+label loop_save
+run ${segSteps}
+write_restart ${rstPrefix}${frame}.restart
+next frame
+jump SELF loop_save
+
+# stop production dump + fix after loop finishes
+undump d_prod
+unfix f_nvt
+
+# ============================================================ Minimize each saved NVT frame (10 times) ============================================================
+variable Etol equal 1e-10
+variable Ftol equal 1e-10
+variable MaxIter equal 20000
+variable MaxEval equal 200000
+
+# Stage 48
+min_style cg
+
+# Stage 49
+variable frame2 loop ${nFrames}
+label loop_min
+clear 
+read_restart ${rstPrefix}${frame2}.restart
+
+# Stage 50
+pair_style grace padding 0.05
+pair_coeff * * /Users/virkaran/.cache/grace/GRACE-FS-OAM Li S
+
+# Stage 51
+thermo 1000
+thermo_style custom step time temp press pe ke etotal vol density
+thermo_modify flush yes
+
+# Stage 52
+reset_timestep 0
+minimize ${Etol} ${Ftol} ${MaxIter} ${MaxEval}
+
+# Stage 53
+write_data minimized_nvt_frame_${frame2}.data
+next frame2
+jump SELF loop_min
