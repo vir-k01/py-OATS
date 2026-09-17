@@ -113,6 +113,41 @@ def test_amorphous_maker_settings_override():
     assert maker.settings["t_npt"] == 20.0
 
 
+def test_amorphous_maker_partial_settings_merge_defaults():
+    maker = AmorphousStateMaker(settings={
+        "potential_path": "/custom/path",
+        "temperature": 2000.0,
+    })
+    assert maker.settings["potential_path"] == "/custom/path"
+    assert maker.settings["temperature"] == 2000.0
+    assert maker.settings["atom_style"] == "atomic"
+    assert maker.settings["t_npt"] == 20.0
+    assert maker.settings["density_threshold"] == 0.30
+
+
+def test_production_maker_partial_settings_merge_defaults():
+    maker = ProductionMDMaker(settings={
+        "temperature": 1000.0,
+        "prod_steps": 5000000,
+    })
+    assert maker.settings["temperature"] == 1000.0
+    assert maker.settings["prod_steps"] == 5000000
+    assert maker.settings["atom_style"] == "atomic"
+    assert maker.settings["pair_style"] == "grace"
+    assert maker.settings["eq_steps"] == 50000
+    assert maker.settings["seed"] == 12345
+
+
+def test_amorphous_maker_empty_settings_gets_all_defaults():
+    maker = AmorphousStateMaker()
+    assert maker.settings == _AMORPHOUS_STATE_DEFAULTS
+
+
+def test_production_maker_empty_settings_gets_all_defaults():
+    maker = ProductionMDMaker()
+    assert maker.settings == _PRODUCTION_MD_DEFAULTS
+
+
 def test_amorphous_maker_inputfile_path():
     maker = AmorphousStateMaker()
     assert Path(maker.inputfile).name == "amorphous_state_job.in"
