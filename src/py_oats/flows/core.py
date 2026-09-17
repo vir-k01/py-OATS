@@ -12,12 +12,14 @@ from py_oats.analyzers.base import BaseAnalyzer
 from py_oats.analyzers.transport import TransportAnalyzer
 from py_oats.io.trajectory import TrajectoryData
 from py_oats.structure_generator.generator import get_amorphous_structure
+from atomate2.lammps.schemas.task import StoreTrajectoryOption
 
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
 
 _AMORPHOUS_STATE_DEFAULTS: dict = {
-    "potential_path": "~/.cache/grace/GRACE-1L-SMAX-OMAT-large/",
+    "atom_style": "atomic",
+    "potential_path": str(Path.home() / ".cache/grace/GRACE-FS-OAM"),
     "temperature": 300.0,
     "pressure": 0.0,
     "time_step": 0.001,
@@ -38,6 +40,20 @@ _AMORPHOUS_STATE_DEFAULTS: dict = {
 }
 
 
+_PRODUCTION_MD_DEFAULTS: dict = {
+    "atom_style": "atomic",
+    "pair_style": "grace",
+    "potential_path": str(Path.home() / ".cache/grace/GRACE-FS-OAM"),
+    "temperature": 300.0,
+    "time_step": 0.001,
+    "log_interval": 100,
+    "dump_interval": 1000,
+    "eq_steps": 50000,
+    "prod_steps": 10000000,
+    "seed": 12345,
+}
+
+
 def _species_string(structure: Structure) -> str:
     """Return a space-separated species string preserving element order."""
     seen: set[str] = set()
@@ -55,8 +71,8 @@ class AmorphousStateMaker(CustomLammpsMaker):
     """
     A ``CustomLammpsMaker`` that generates an amorphous structure from a
     composition and uses LAMMPS with a fast GRACE-FS potential to equilibrate it
-    and a bigger GRACE-3L potential to relax it a local minimum. This is akin to
-    generating the structures to use for ``amorphous limit'' calculations.
+    and a bigger GRACE-3L potential to relax it a local minimum (keeping a cubic cell). 
+    This is akin to generating the structures to use for ``amorphous limit'' calculations.
     The output structures of this job can be used as inputs for other MD jobs as well.
     """
 
@@ -91,6 +107,29 @@ class ProductionMDMaker(CustomLammpsMaker):
     inputfile: str | Path = field(
         default_factory=lambda: TEMPLATE_DIR / "production_md_job.in"
     )
+    settings: dict = field(default_factory=lambda: _PRODUCTION_MD_DEFAULTS.copy())
+    task_document_kwargs: dict = field(default_factory=lambda: {"store_trajectory": StoreTrajectoryOption.PARTIAL})
+
+    def make(self, input_structure: Structure | None = None, **kwargs):
+        if input_structure is not None:
+            species = _species_string(input_structure)
+            elements = species.split()
+            fmt_parts = ["$(step)"]
+            for i in range(1, len(elements) + 1):
+                fmt_parts += [f"$(c_vcm[{i}][{d}])" for d in (1, 2, 3)]
+            title_parts = ["step"]
+            for e in elements:
+                title_parts += [f"{e}_vx", f"{e}_vy", f"{e}_vz"]
+            vel_dump_cmd = (
+                f'"{" ".join(fmt_parts)}" '
+                f'file species_vcm.dat screen no '
+                f'title "# {" ".join(title_parts)}"'
+            )
+            self.input_set_generator.update_settings(
+                {"species_string": species, "vel_dump_cmd": vel_dump_cmd},
+                validate_params=False,
+            )
+        return super().make(input_structure=input_structure, **kwargs)
 
 
 @dataclass

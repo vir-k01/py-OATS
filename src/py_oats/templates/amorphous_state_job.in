@@ -23,7 +23,7 @@ read_data       input.data
 # -------------------------
 # GRACE potential
 # -------------------------
-pair_style      grace padding 0.05 pad_verbose
+pair_style      grace padding 0.05
 pair_coeff      * * ${potential_path} ${species_string}
 
 neighbor        2.0 bin
@@ -142,9 +142,13 @@ label density_restore_initial
   clear
   read_restart npt_initial_structure.rst
 
-  # Pair style/coeff may be required after clear
-  pair_style      grace padding 0.05 pad_verbose
+  # Pair style/coeff and thermo required after clear
+  pair_style      grace padding 0.05
   pair_coeff      * * ${potential_path} ${species_string}
+
+  thermo          ${thermo_interval}
+  thermo_style    custom step time temp press pe ke etotal vol density
+  thermo_modify   flush yes
 
   jump SELF density_start_production
 
@@ -202,10 +206,12 @@ label loop_min
   clear
   read_restart ${rstPrefix}${frame2}.restart
 
-  pair_style      grace padding 0.05 pad_verbose
+  pair_style      grace padding 0.05
   pair_coeff      * * ${potential_path} ${species_string}
 
-  thermo_style    custom step temp press pe ke etotal vol density
+  thermo          ${thermo_interval}
+  thermo_style    custom step time temp press pe ke etotal vol density
+  thermo_modify   flush yes
 
   reset_timestep 0
   minimize ${Etol} ${Ftol} ${MaxIter} ${MaxEval}
