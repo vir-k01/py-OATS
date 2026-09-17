@@ -116,7 +116,7 @@ class AnalysisMaker(Maker):
         data = TrajectoryData.read(
             trajectory_file,
             temperature=self.temperature,
-            time_step=self.time_step,
+            time_step=self.time_step * 1000.0,  # LAMMPS metal ps → TrajectoryData fs
             step_skip=self.dump_interval,
         )
         docs = []
@@ -136,6 +136,9 @@ class AnalysisMaker(Maker):
 class ProductionOnsagerMaker(Maker):
 
     name: str = "production_onsager_job"
+    amorphous_state_maker: AmorphousStateMaker = field(
+        default_factory=AmorphousStateMaker
+    )
     production_md_maker: ProductionMDMaker = field(
         default_factory=ProductionMDMaker
     )
@@ -156,7 +159,7 @@ class ProductionOnsagerMaker(Maker):
     def make(self, structure_or_composition: Structure | Composition, **kwargs):
         jobs = []
         if isinstance(structure_or_composition, Composition):
-            structure_job = AmorphousStateMaker().make(
+            structure_job = self.amorphous_state_maker.make(
                 composition=structure_or_composition
             )
             jobs.append(structure_job)

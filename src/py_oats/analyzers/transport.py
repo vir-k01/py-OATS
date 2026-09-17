@@ -132,10 +132,11 @@ class TransportAnalyzer(BaseAnalyzer):
     def get_diffusivity(self, specie: str | int) -> float:
         """Get the Einstein self-diffusion coefficient for a given species in cm^2/s.
 
-        D_i = kBT * L_ii_self / N_i
+        D_i = slope_self / (6 * N_i) * 0.1
+        where slope_self is the raw MSD slope in Å²/fs and 0.1 converts to cm²/s.
         """
         if isinstance(specie, str):
             specie = self.mapping[specie]
 
         specie_amount = len(self.trajectory.species[self.trajectory.species == self.inv_mapping[specie]])
-        return self.kbT * self.L_tensor_self[specie, specie] / specie_amount
+        return self._L_tensor_self[specie, specie] / (6.0 * specie_amount) * 0.1

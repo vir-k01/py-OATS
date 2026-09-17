@@ -117,9 +117,9 @@ class TransportDoc(BaseModel):
         td.times = analyzer.times.tolist()
         td.time_step = analyzer.time_step
         td.step_skip = analyzer.step_skip
-        # Derive composition and reduced formula from trajectory species if possible.
         td.composition = analyzer.trajectory.composition
-
+        if td.composition:
+            td.reduced_formula = Composition(td.composition).reduced_formula
         td.num_atoms = analyzer.trajectory.n_atoms
 
         # Diffusivity per species using self-transport coefficients.
