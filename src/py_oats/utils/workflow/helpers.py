@@ -14,6 +14,7 @@ TEMPLATE_DIR = Path(__file__).resolve().parent.parent.parent / "templates"
 
 _AMORPHOUS_STATE_DEFAULTS: dict = {
     "atom_style": "atomic",
+    "pair_style": "grace padding 0.05",
     "potential_path": str(Path.home() / ".cache/grace/GRACE-FS-OAM"),
     "temperature": 300.0,
     "pressure": 0.0,
