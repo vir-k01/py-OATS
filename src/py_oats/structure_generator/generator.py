@@ -20,25 +20,19 @@ from typing import Literal
 from py_oats.structure_generator.density_descriptor import predict_density
 from py_oats.utils.polyhedra import get_polyhedra_from_mp
 
-_DEFAULT_AVG_VOL_FILE = Path("~/.cache/py_oats").expanduser() / "db_avg_vols.json.gz"
-if not _DEFAULT_AVG_VOL_FILE.parents[0].exists():
-    os.makedirs(_DEFAULT_AVG_VOL_FILE.parents[0], exist_ok=True)
-_DEFAULT_AVG_VOL_URL = "https://figshare.com/ndownloader/files/49704288"
+_BUNDLED_AVG_VOL_FILE = Path(__file__).parent / "data" / "db_avg_vols.json.gz"
+_CACHED_AVG_VOL_FILE = Path("~/.cache/py_oats").expanduser() / "db_avg_vols.json.gz"
 
 
-def _get_average_volumes_file(
-    chunk_size: int = 2048, timeout: float = 60
-) -> pd.DataFrame:
-    """Retrieve stored average volume data from figshare if not cached locally."""
-    if not _DEFAULT_AVG_VOL_FILE.exists():
-        import requests
-
-        stream_data = requests.get(_DEFAULT_AVG_VOL_URL, stream=True, timeout=timeout)
-        with open(str(_DEFAULT_AVG_VOL_FILE), "wb") as file:
-            for chunk in stream_data.iter_content(chunk_size=chunk_size):
-                file.write(chunk)
-
-    return pd.read_json(_DEFAULT_AVG_VOL_FILE, orient="split")
+def _get_average_volumes_file() -> pd.DataFrame:
+    """Load the average volume database, preferring the bundled copy."""
+    for path in (_BUNDLED_AVG_VOL_FILE, _CACHED_AVG_VOL_FILE):
+        if path.exists() and path.stat().st_size > 0:
+            return pd.read_json(path, orient="split")
+    raise FileNotFoundError(
+        "Average volume database not found. Expected at "
+        f"{_BUNDLED_AVG_VOL_FILE} or {_CACHED_AVG_VOL_FILE}"
+    )
 
 
 def _get_chem_env_key_from_composition(

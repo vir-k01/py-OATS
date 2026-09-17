@@ -27,6 +27,9 @@ dependencies = [
 [project.optional-dependencies]
 charge = ["chgnet"]
 
+[tool.setuptools.package-data]
+py_oats = ["structure_generator/data/*.json.gz", "templates/*.in"]
+
 [tool.pytest.ini_options]
 markers = [
     "integration: requires external API access (skip with '-m \"not integration\"')",
