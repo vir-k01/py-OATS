@@ -53,15 +53,33 @@ _ANALYZER_TO_SCHEMA: dict[type[BaseAnalyzer], type] = {
 
 
 def _species_string(structure: Structure) -> str:
-    """Return a space-separated species string preserving element order."""
-    seen: set[str] = set()
-    species: list[str] = []
-    for site in structure:
-        sym = site.specie.symbol
-        if sym not in seen:
-            seen.add(sym)
-            species.append(sym)
-    return " ".join(species)
+    """Return a space-separated species string in pymatgen Element order.
+
+    Must match the type ordering that ``LammpsData.from_structure`` uses:
+    ``sorted(Element(el) for el in symbols)``, which sorts by
+    electronegativity (the default ``Element`` comparison).
+    """
+    from pymatgen.core import Element
+    elements = sorted({Element(site.specie.symbol) for site in structure})
+    return " ".join(e.symbol for e in elements)
+
+
+def _build_species_settings(structure: Structure) -> dict:
+    """Build species_string and vel_dump_cmd from a resolved Structure."""
+    species = _species_string(structure)
+    elements = species.split()
+    fmt_parts = ["$(step)"]
+    for i in range(1, len(elements) + 1):
+        fmt_parts += [f"$(c_vcm[{i}][{d}])" for d in (1, 2, 3)]
+    title_parts = ["step"]
+    for e in elements:
+        title_parts += [f"{e}_vx", f"{e}_vy", f"{e}_vz"]
+    vel_dump_cmd = (
+        f'"{" ".join(fmt_parts)}" '
+        f'file species_vcm.dat screen no '
+        f'title "# {" ".join(title_parts)}"'
+    )
+    return {"species_string": species, "vel_dump_cmd": vel_dump_cmd}
 
 
 def _find_trajectory_file(run_dir: str) -> str:

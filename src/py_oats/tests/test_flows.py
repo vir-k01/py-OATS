@@ -16,9 +16,11 @@ from py_oats.workflow.core import (
     ProductionMDMaker,
     AnalysisMaker,
     ProductionOnsagerMaker,
+    run_production_md,
 )
 from py_oats.utils.workflow.helpers import (
     _species_string,
+    _build_species_settings,
     _AMORPHOUS_STATE_DEFAULTS,
     _PRODUCTION_MD_DEFAULTS,
     TEMPLATE_DIR,
@@ -74,12 +76,12 @@ def test_species_string_preserves_order(li2s_structure):
     assert result == "Li S"
 
 
-def test_species_string_no_duplicates():
+def test_species_string_sorted_by_element_order():
     lattice = Lattice.cubic(5.0)
     struct = Structure(lattice, ["O", "Li", "O", "Li"], [
         [0, 0, 0], [1, 0, 0], [2, 0, 0], [3, 0, 0]
     ], coords_are_cartesian=True)
-    assert _species_string(struct) == "O Li"
+    assert _species_string(struct) == "Li O"
 
 
 # ---------------------------------------------------------------------------
@@ -355,3 +357,73 @@ def test_production_onsager_maker_defaults():
     assert maker.name == "production_onsager_job"
     assert isinstance(maker.production_md_maker, ProductionMDMaker)
     assert isinstance(maker.analysis_maker, AnalysisMaker)
+
+
+# ---------------------------------------------------------------------------
+# _build_species_settings
+# ---------------------------------------------------------------------------
+
+def test_build_species_settings_two_species(li2s_structure):
+    settings = _build_species_settings(li2s_structure)
+    assert settings["species_string"] == "Li S"
+    assert "$(step)" in settings["vel_dump_cmd"]
+    assert "$(c_vcm[1][1])" in settings["vel_dump_cmd"]
+    assert "$(c_vcm[2][3])" in settings["vel_dump_cmd"]
+    assert "Li_vx" in settings["vel_dump_cmd"]
+    assert "S_vz" in settings["vel_dump_cmd"]
+
+
+def test_build_species_settings_three_species():
+    lattice = Lattice.cubic(10.0)
+    struct = Structure(lattice, ["Li", "Mn", "O"],
+                       [[0, 0, 0], [2, 2, 2], [4, 4, 4]],
+                       coords_are_cartesian=True)
+    settings = _build_species_settings(struct)
+    assert settings["species_string"] == "Li Mn O"
+    assert "$(c_vcm[3][1])" in settings["vel_dump_cmd"]
+    assert "Mn_vy" in settings["vel_dump_cmd"]
+
+
+# ---------------------------------------------------------------------------
+# ProductionMDMaker.make skips species on OutputReference
+# ---------------------------------------------------------------------------
+
+def test_production_maker_skips_species_on_non_structure():
+    from jobflow import OutputReference
+    maker = ProductionMDMaker(settings=_PRODUCTION_MD_DEFAULTS.copy())
+    ref = OutputReference("fake-uuid")
+    job = maker.make(input_structure=ref)
+    settings = maker.input_set_generator.settings.as_dict()
+    assert "species_string" not in settings
+
+
+# ---------------------------------------------------------------------------
+# run_production_md — flow construction with OutputReference
+# ---------------------------------------------------------------------------
+
+def test_run_production_md_creates_job():
+    job = run_production_md(
+        input_structure="placeholder",
+        production_md_maker=ProductionMDMaker(settings=_PRODUCTION_MD_DEFAULTS.copy()),
+    )
+    assert job.name == "run_production_md"
+
+
+def test_onsager_maker_builds_flow_with_composition():
+    maker = ProductionOnsagerMaker()
+    flow = maker.make(structure_or_composition=Composition("Li2S"))
+    assert flow.name == "production_onsager_job"
+    assert len(flow.jobs) == 3
+    job_names = [j.name for j in flow.jobs]
+    assert "BaseLammpsMaker.make" in job_names
+    assert "run_production_md" in job_names
+    assert "analysis_job" in job_names
+
+
+def test_onsager_maker_builds_flow_with_structure(li2s_structure):
+    maker = ProductionOnsagerMaker()
+    flow = maker.make(structure_or_composition=li2s_structure)
+    assert len(flow.jobs) == 2
+    job_names = [j.name for j in flow.jobs]
+    assert "run_production_md" in job_names
+    assert "analysis_job" in job_names
