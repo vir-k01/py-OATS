@@ -47,7 +47,6 @@ def li2s_structure():
 @pytest.fixture
 def amorphous_maker():
     return AmorphousStateMaker(settings={
-        **_AMORPHOUS_STATE_DEFAULTS.copy(),
         "t_npt": 0.5,
         "t_nvt": 0.5,
         "t_ramp": 0.5,
@@ -58,7 +57,6 @@ def amorphous_maker():
 @pytest.fixture
 def production_maker():
     return ProductionMDMaker(settings={
-        **_PRODUCTION_MD_DEFAULTS.copy(),
         "temperature": 1000.0,
         "eq_steps": 500,
         "prod_steps": 1000,
@@ -110,10 +108,7 @@ def test_amorphous_maker_defaults():
 
 
 def test_amorphous_maker_settings_override():
-    maker = AmorphousStateMaker(settings={
-        **_AMORPHOUS_STATE_DEFAULTS.copy(),
-        "temperature": 1500.0,
-    })
+    maker = AmorphousStateMaker(settings={"temperature": 1500.0})
     assert maker.settings["temperature"] == 1500.0
     assert maker.settings["t_npt"] == 20.0
 
@@ -149,11 +144,7 @@ def test_production_maker_inputfile_path():
 
 
 def test_production_maker_settings_override():
-    maker = ProductionMDMaker(settings={
-        **_PRODUCTION_MD_DEFAULTS.copy(),
-        "temperature": 2000.0,
-        "prod_steps": 500,
-    })
+    maker = ProductionMDMaker(settings={"temperature": 2000.0, "prod_steps": 500})
     assert maker.settings["temperature"] == 2000.0
     assert maker.settings["prod_steps"] == 500
 
@@ -179,7 +170,7 @@ def test_vel_dump_cmd_three_species():
     struct = Structure(lattice, ["Li", "Mn", "O"],
                        [[0, 0, 0], [2, 2, 2], [4, 4, 4]],
                        coords_are_cartesian=True)
-    maker = ProductionMDMaker(settings=_PRODUCTION_MD_DEFAULTS.copy())
+    maker = ProductionMDMaker()
     maker.make(input_structure=struct)
     settings = maker.input_set_generator.settings.as_dict()
     vel_cmd = settings["vel_dump_cmd"]
@@ -390,7 +381,7 @@ def test_build_species_settings_three_species():
 
 def test_production_maker_skips_species_on_non_structure():
     from jobflow import OutputReference
-    maker = ProductionMDMaker(settings=_PRODUCTION_MD_DEFAULTS.copy())
+    maker = ProductionMDMaker()
     ref = OutputReference("fake-uuid")
     job = maker.make(input_structure=ref)
     settings = maker.input_set_generator.settings.as_dict()
@@ -404,7 +395,7 @@ def test_production_maker_skips_species_on_non_structure():
 def test_run_production_md_creates_job():
     job = run_production_md(
         input_structure="placeholder",
-        production_md_maker=ProductionMDMaker(settings=_PRODUCTION_MD_DEFAULTS.copy()),
+        production_md_maker=ProductionMDMaker(),
     )
     assert job.name == "run_production_md"
 

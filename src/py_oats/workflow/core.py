@@ -37,7 +37,11 @@ class AmorphousStateMaker(CustomLammpsMaker):
     inputfile: str | Path = field(
         default_factory=lambda: TEMPLATE_DIR / "amorphous_state_job.in"
     )
-    settings: dict = field(default_factory=lambda: _AMORPHOUS_STATE_DEFAULTS.copy())
+    settings: dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        self.settings = {**_AMORPHOUS_STATE_DEFAULTS, **self.settings}
+        super().__post_init__()
 
     def make(self, composition: Composition, **kwargs):
         amorphous_structure = get_amorphous_structure(composition)
@@ -69,8 +73,12 @@ class ProductionMDMaker(CustomLammpsMaker):
     inputfile: str | Path = field(
         default_factory=lambda: TEMPLATE_DIR / "production_md_job.in"
     )
-    settings: dict = field(default_factory=lambda: _PRODUCTION_MD_DEFAULTS.copy())
+    settings: dict = field(default_factory=dict)
     task_document_kwargs: dict = field(default_factory=lambda: {"store_trajectory": StoreTrajectoryOption.PARTIAL})
+
+    def __post_init__(self):
+        self.settings = {**_PRODUCTION_MD_DEFAULTS, **self.settings}
+        super().__post_init__()
 
     def make(self, input_structure: Structure | None = None, **kwargs):
         if input_structure is not None and isinstance(input_structure, Structure):
