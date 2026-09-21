@@ -83,6 +83,77 @@ def _build_species_settings(structure: Structure) -> dict:
     return {"species_string": species, "vel_dump_cmd": vel_dump_cmd}
 
 
+def check_lammps_grace(
+    lammps_cmd: str | None = None,
+    pair_style: str = "grace",
+) -> str:
+    """Verify a LAMMPS binary exists and supports the requested GRACE pair style.
+
+    Searches (in order): ``lammps_cmd`` argument, ``LAMMPS_CMD`` from
+    atomate2 settings, ``$lmp`` env var, then ``lmp`` on PATH.
+
+    Returns the resolved LAMMPS command string.
+
+    Raises:
+        FileNotFoundError: if no LAMMPS binary is found.
+        RuntimeError: if the binary lacks the requested pair style.
+    """
+    import shutil
+    import subprocess
+
+    candidates: list[str] = []
+    if lammps_cmd:
+        candidates.append(lammps_cmd)
+
+    try:
+        from atomate2.settings import Atomate2Settings
+        settings = Atomate2Settings()
+        if settings.LAMMPS_CMD:
+            candidates.append(settings.LAMMPS_CMD)
+    except Exception:
+        pass
+
+    env_lmp = os.environ.get("lmp")
+    if env_lmp:
+        candidates.append(env_lmp)
+
+    candidates.append("lmp")
+
+    resolved = None
+    for cmd in candidates:
+        path = shutil.which(cmd)
+        if path:
+            resolved = path
+            break
+        if os.path.isfile(cmd) and os.access(cmd, os.X_OK):
+            resolved = cmd
+            break
+
+    if resolved is None:
+        raise FileNotFoundError(
+            "No LAMMPS binary found. Searched: "
+            + ", ".join(candidates)
+            + ". Set LAMMPS_CMD in atomate2.yaml, export $lmp, or add lmp to PATH."
+        )
+
+    style_name = pair_style.split()[0]
+    try:
+        result = subprocess.run(
+            [resolved, "-h"],
+            capture_output=True, text=True, timeout=30,
+        )
+        help_text = result.stdout + result.stderr
+        if style_name not in help_text:
+            raise RuntimeError(
+                f"LAMMPS at {resolved} does not support pair_style '{style_name}'. "
+                f"Rebuild LAMMPS with the ML-PACE or GRACE plugin."
+            )
+    except subprocess.TimeoutExpired:
+        pass
+
+    return resolved
+
+
 def _find_trajectory_file(run_dir: str) -> str:
     """Locate production.dump or production.dump.gz in a run directory."""
     for name in ("production.dump", "production.dump.gz"):
