@@ -453,3 +453,53 @@ def test_onsager_maker_builds_flow_with_structure(li2s_structure):
     job_names = [j.name for j in flow.jobs]
     assert "run_production_md" in job_names
     assert "analysis_job" in job_names
+
+
+# ---------------------------------------------------------------------------
+# check_lammps_grace / _resolve_lammps_binary
+
+
+@pytest.fixture
+def fake_lmp(tmp_path):
+    """A fake LAMMPS binary whose -h output lists the grace pair styles."""
+    exe = tmp_path / "lmp"
+    exe.write_text("#!/bin/sh\necho 'pair styles: grace grace/fs'\n")
+    exe.chmod(0o755)
+    return str(exe)
+
+
+def test_resolve_binary_bare_path(fake_lmp):
+    from py_oats.utils.workflow.helpers import _resolve_lammps_binary
+    assert _resolve_lammps_binary(fake_lmp) == fake_lmp
+
+
+def test_resolve_binary_launcher_wrapped(fake_lmp):
+    from py_oats.utils.workflow.helpers import _resolve_lammps_binary
+    cmd = f"srun -N1 -n1 --gpus=1 -c32 --cpu-bind=none {fake_lmp}"
+    assert _resolve_lammps_binary(cmd) == fake_lmp
+
+
+def test_resolve_binary_mpirun_with_rank_count(fake_lmp):
+    from py_oats.utils.workflow.helpers import _resolve_lammps_binary
+    # "4" must not be mistaken for the binary
+    assert _resolve_lammps_binary(f"mpirun -n 4 {fake_lmp}") == fake_lmp
+
+
+def test_resolve_binary_nothing_resolvable():
+    from py_oats.utils.workflow.helpers import _resolve_lammps_binary
+    assert _resolve_lammps_binary("srun -n1 /no/such/lmp") is None
+
+
+def test_check_lammps_grace_launcher_command_returned_verbatim(fake_lmp):
+    from py_oats.utils.workflow.helpers import check_lammps_grace
+    cmd = f"srun -N1 -n1 --gpus=1 {fake_lmp}"
+    assert check_lammps_grace(lammps_cmd=cmd, pair_style="grace/fs") == cmd
+
+
+def test_check_lammps_grace_missing_style_raises(tmp_path):
+    from py_oats.utils.workflow.helpers import check_lammps_grace
+    exe = tmp_path / "lmp"
+    exe.write_text("#!/bin/sh\necho 'pair styles: lj/cut eam'\n")
+    exe.chmod(0o755)
+    with pytest.raises(RuntimeError, match="does not support"):
+        check_lammps_grace(lammps_cmd=str(exe), pair_style="grace")
