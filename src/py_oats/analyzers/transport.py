@@ -70,7 +70,7 @@ class TransportAnalyzer(BaseAnalyzer):
         self,
         start_step: int | None = None,
         end_step: int | None = None,
-        smoothing: str | None = "best_fit",
+        smoothing: str | None = "blockavg",
     ) -> None:
         """
         Compute L_ij from FFT MSD/cross-MSD and linear fit. Fills L_tensor,
@@ -80,9 +80,11 @@ class TransportAnalyzer(BaseAnalyzer):
             start_step: int, start time index for fitting
             end_step: int, end time index for fitting
             smoothing: str, type of smoothing to apply when fitting the data.
-                "best_fit" (default) brute-forces the best fit interval.
-                "blockavg" uses block averaging.
-                None does not smooth the data.
+                "blockavg" (default) uses block averaging.
+                "best_fit" brute-forces the best fit interval; it can pick
+                a short, early (sub-diffusive) window and is off by up to
+                ~6x on resolved oxide-melt MSDs, so it is not the default.
+                None fits the whole start_step:end_step window directly.
         """
         T = self.traj_length
         if start_step is None:

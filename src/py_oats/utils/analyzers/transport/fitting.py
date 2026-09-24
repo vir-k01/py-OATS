@@ -92,7 +92,7 @@ def fit_data(
     times: np.ndarray,
     start: int,
     end: int,
-    smoothing: str = "best_fit",
+    smoothing: str | None = "blockavg",
 ) -> tuple[float, dict]:
     if smoothing == "best_fit":
         return fit_in_best_fit_interval(f, times, start, end)
