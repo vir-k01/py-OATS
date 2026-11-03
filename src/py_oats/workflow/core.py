@@ -3,9 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from jobflow import Flow, Maker, Response, job
+from jobflow import Flow, Maker, job
 from pymatgen.core import Composition, Structure
 
+from atomate2.lammps.jobs.base import BaseLammpsMaker, lammps_job
 from atomate2.lammps.jobs.core import CustomLammpsMaker
 from atomate2.lammps.schemas.task import StoreTrajectoryOption
 from py_oats.analyzers.base import BaseAnalyzer
@@ -43,16 +44,16 @@ class AmorphousStateMaker(CustomLammpsMaker):
         self.settings = {**_AMORPHOUS_STATE_DEFAULTS, **self.settings}
         super().__post_init__()
 
+    @lammps_job
     def make(self, composition: Composition, **kwargs):
         amorphous_structure = get_amorphous_structure(composition)
         species = _species_string(amorphous_structure)
-        self.settings["species_string"] = species
         self.input_set_generator.update_settings(
             {"species_string": species}, validate_params=False
         )
-        j = super().make(input_structure=amorphous_structure, **kwargs)
-        j.name = self.name
-        return j
+        return BaseLammpsMaker.make.original(
+            self, input_structure=amorphous_structure, **kwargs
+        )
 
 
 @dataclass
@@ -65,11 +66,6 @@ class ProductionMDMaker(CustomLammpsMaker):
     `get_amorphous_structure` can also be used. A well-suited MLIP should be
     provided for this job. In the absence of an MLIP, the GRACE-FS potential will
     be used as a default.
-
-    When called directly with a resolved Structure, species_string and
-    vel_dump_cmd are computed at build time. When chained via
-    ProductionOnsagerMaker with an OutputReference, use
-    ``run_production_md`` instead — it resolves the structure at runtime.
     """
 
     name: str = "production_md_job"
@@ -83,35 +79,16 @@ class ProductionMDMaker(CustomLammpsMaker):
         self.settings = {**_PRODUCTION_MD_DEFAULTS, **self.settings}
         super().__post_init__()
 
+    @lammps_job
     def make(self, input_structure: Structure | None = None, **kwargs):
-        if input_structure is not None and isinstance(input_structure, Structure):
-            species_settings = _build_species_settings(input_structure)
-            self.settings.update(species_settings)
+        if input_structure is not None:
             self.input_set_generator.update_settings(
-                species_settings, validate_params=False,
+                _build_species_settings(input_structure),
+                validate_params=False,
             )
-        j = super().make(input_structure=input_structure, **kwargs)
-        j.name = self.name
-        return j
-
-
-@job
-def run_production_md(
-    input_structure: Structure,
-    production_md_maker: ProductionMDMaker,
-) -> Response:
-    """Resolve species at runtime and replace with the real LAMMPS job.
-
-    Use this instead of ``ProductionMDMaker.make()`` when
-    ``input_structure`` is an ``OutputReference`` (e.g. from a prior job).
-    """
-    species_settings = _build_species_settings(input_structure)
-    production_md_maker.settings.update(species_settings)
-    production_md_maker.input_set_generator.update_settings(
-        species_settings, validate_params=False,
-    )
-    lammps_job = production_md_maker.make(input_structure=input_structure)
-    return Response(replace=lammps_job)
+        return BaseLammpsMaker.make.original(
+            self, input_structure=input_structure, **kwargs
+        )
 
 
 @dataclass
@@ -182,9 +159,8 @@ class ProductionOnsagerMaker(Maker):
         else:
             structure = structure_or_composition
 
-        production_md_job = run_production_md(
-            input_structure=structure,
-            production_md_maker=self.production_md_maker,
+        production_md_job = self.production_md_maker.make(
+            input_structure=structure, **kwargs
         )
         analysis_job = self.analysis_maker.make(
             run_dir=production_md_job.output.dir_name

@@ -16,7 +16,6 @@ from py_oats.workflow.core import (
     ProductionMDMaker,
     AnalysisMaker,
     ProductionOnsagerMaker,
-    run_production_md,
 )
 from py_oats.utils.workflow.helpers import (
     _species_string,
@@ -185,39 +184,19 @@ def test_production_maker_settings_override():
 
 
 # ---------------------------------------------------------------------------
-# ProductionMDMaker — vel_dump_cmd construction
+# Makers return @lammps_job Jobs with correct names
 # ---------------------------------------------------------------------------
 
-def test_vel_dump_cmd_two_species(production_maker, li2s_structure):
-    production_maker.make(input_structure=li2s_structure)
-    settings = production_maker.input_set_generator.settings.as_dict()
-    vel_cmd = settings["vel_dump_cmd"]
-    assert "$(step)" in vel_cmd
-    assert "$(c_vcm[1][1])" in vel_cmd
-    assert "$(c_vcm[2][3])" in vel_cmd
-    assert "Li_vx" in vel_cmd
-    assert "S_vz" in vel_cmd
-    assert "species_vcm.dat" in vel_cmd
+def test_amorphous_maker_job_name():
+    maker = AmorphousStateMaker(settings={"t_npt": 0.5, "t_nvt": 0.5, "t_ramp": 0.5, "n_frames": 2})
+    job = maker.make(composition=Composition("Li2S"))
+    assert job.name == "amorphous_state_job"
 
 
-def test_vel_dump_cmd_three_species():
-    lattice = Lattice.cubic(10.0)
-    struct = Structure(lattice, ["Li", "Mn", "O"],
-                       [[0, 0, 0], [2, 2, 2], [4, 4, 4]],
-                       coords_are_cartesian=True)
+def test_production_maker_job_name(li2s_structure):
     maker = ProductionMDMaker()
-    maker.make(input_structure=struct)
-    settings = maker.input_set_generator.settings.as_dict()
-    vel_cmd = settings["vel_dump_cmd"]
-    assert "$(c_vcm[3][1])" in vel_cmd
-    assert "Mn_vy" in vel_cmd
-    assert "O_vz" in vel_cmd
-
-
-def test_species_string_injected(production_maker, li2s_structure):
-    production_maker.make(input_structure=li2s_structure)
-    settings = production_maker.input_set_generator.settings.as_dict()
-    assert settings["species_string"] == "Li S"
+    job = maker.make(input_structure=li2s_structure)
+    assert job.name == "production_md_job"
 
 
 # ---------------------------------------------------------------------------
@@ -239,7 +218,9 @@ def test_amorphous_input_generates_valid_lammps(amorphous_maker, li2s_structure,
 
 
 def test_production_input_generates_valid_lammps(production_maker, li2s_structure, tmp_path):
-    production_maker.make(input_structure=li2s_structure)
+    production_maker.input_set_generator.update_settings(
+        _build_species_settings(li2s_structure), validate_params=False
+    )
     input_set = production_maker.input_set_generator.get_input_set(data=li2s_structure)
     input_set.write_input(tmp_path)
     in_lammps = (tmp_path / "in.lammps").read_text()
@@ -264,7 +245,9 @@ def test_amorphous_input_data_is_atomic_style(amorphous_maker, li2s_structure, t
 
 
 def test_production_input_has_npt_volume_averaging(production_maker, li2s_structure, tmp_path):
-    production_maker.make(input_structure=li2s_structure)
+    production_maker.input_set_generator.update_settings(
+        _build_species_settings(li2s_structure), validate_params=False
+    )
     input_set = production_maker.input_set_generator.get_input_set(data=li2s_structure)
     input_set.write_input(tmp_path)
     in_lammps = (tmp_path / "in.lammps").read_text()
@@ -414,26 +397,10 @@ def test_build_species_settings_three_species():
 # ProductionMDMaker.make skips species on OutputReference
 # ---------------------------------------------------------------------------
 
-def test_production_maker_skips_species_on_non_structure():
-    from jobflow import OutputReference
-    maker = ProductionMDMaker()
-    ref = OutputReference("fake-uuid")
-    job = maker.make(input_structure=ref)
-    settings = maker.input_set_generator.settings.as_dict()
-    assert "species_string" not in settings
-
 
 # ---------------------------------------------------------------------------
-# run_production_md — flow construction with OutputReference
+# ProductionOnsagerMaker — flow construction
 # ---------------------------------------------------------------------------
-
-def test_run_production_md_creates_job():
-    job = run_production_md(
-        input_structure="placeholder",
-        production_md_maker=ProductionMDMaker(),
-    )
-    assert job.name == "run_production_md"
-
 
 def test_onsager_maker_builds_flow_with_composition():
     maker = ProductionOnsagerMaker()
@@ -442,7 +409,7 @@ def test_onsager_maker_builds_flow_with_composition():
     assert len(flow.jobs) == 3
     job_names = [j.name for j in flow.jobs]
     assert "amorphous_state_job" in job_names
-    assert "run_production_md" in job_names
+    assert "production_md_job" in job_names
     assert "analysis_job" in job_names
 
 
@@ -451,7 +418,7 @@ def test_onsager_maker_builds_flow_with_structure(li2s_structure):
     flow = maker.make(structure_or_composition=li2s_structure)
     assert len(flow.jobs) == 2
     job_names = [j.name for j in flow.jobs]
-    assert "run_production_md" in job_names
+    assert "production_md_job" in job_names
     assert "analysis_job" in job_names
 
 
