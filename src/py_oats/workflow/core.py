@@ -46,6 +46,7 @@ class AmorphousStateMaker(CustomLammpsMaker):
     def make(self, composition: Composition, **kwargs):
         amorphous_structure = get_amorphous_structure(composition)
         species = _species_string(amorphous_structure)
+        self.settings["species_string"] = species
         self.input_set_generator.update_settings(
             {"species_string": species}, validate_params=False
         )
@@ -84,9 +85,10 @@ class ProductionMDMaker(CustomLammpsMaker):
 
     def make(self, input_structure: Structure | None = None, **kwargs):
         if input_structure is not None and isinstance(input_structure, Structure):
+            species_settings = _build_species_settings(input_structure)
+            self.settings.update(species_settings)
             self.input_set_generator.update_settings(
-                _build_species_settings(input_structure),
-                validate_params=False,
+                species_settings, validate_params=False,
             )
         j = super().make(input_structure=input_structure, **kwargs)
         j.name = self.name
@@ -103,9 +105,10 @@ def run_production_md(
     Use this instead of ``ProductionMDMaker.make()`` when
     ``input_structure`` is an ``OutputReference`` (e.g. from a prior job).
     """
+    species_settings = _build_species_settings(input_structure)
+    production_md_maker.settings.update(species_settings)
     production_md_maker.input_set_generator.update_settings(
-        _build_species_settings(input_structure),
-        validate_params=False,
+        species_settings, validate_params=False,
     )
     lammps_job = production_md_maker.make(input_structure=input_structure)
     return Response(replace=lammps_job)
