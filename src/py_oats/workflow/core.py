@@ -49,7 +49,9 @@ class AmorphousStateMaker(CustomLammpsMaker):
         self.input_set_generator.update_settings(
             {"species_string": species}, validate_params=False
         )
-        return super().make(input_structure=amorphous_structure, **kwargs)
+        j = super().make(input_structure=amorphous_structure, **kwargs)
+        j.name = self.name
+        return j
 
 
 @dataclass
@@ -86,7 +88,9 @@ class ProductionMDMaker(CustomLammpsMaker):
                 _build_species_settings(input_structure),
                 validate_params=False,
             )
-        return super().make(input_structure=input_structure, **kwargs)
+        j = super().make(input_structure=input_structure, **kwargs)
+        j.name = self.name
+        return j
 
 
 @job

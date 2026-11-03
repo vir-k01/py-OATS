@@ -441,7 +441,7 @@ def test_onsager_maker_builds_flow_with_composition():
     assert flow.name == "production_onsager_job"
     assert len(flow.jobs) == 3
     job_names = [j.name for j in flow.jobs]
-    assert "BaseLammpsMaker.make" in job_names
+    assert "amorphous_state_job" in job_names
     assert "run_production_md" in job_names
     assert "analysis_job" in job_names
 
