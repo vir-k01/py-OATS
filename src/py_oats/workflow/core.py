@@ -51,9 +51,7 @@ class AmorphousStateMaker(CustomLammpsMaker):
         self.input_set_generator.update_settings(
             {"species_string": species}, validate_params=False
         )
-        return BaseLammpsMaker.make.original(
-            self, input_structure=amorphous_structure, **kwargs
-        )
+        return BaseLammpsMaker.make.original(self, input_structure=amorphous_structure)
 
 
 @dataclass
