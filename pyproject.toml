@@ -29,7 +29,7 @@ dependencies = [
 charge = ["chgnet"]
 
 [tool.setuptools.package-data]
-py_oats = ["structure_generator/data/*.json.gz", "templates/*.in"]
+py_oats = ["structure_generator/*.json", "structure_generator/data/*.json.gz", "templates/*.in"]
 
 [tool.pytest.ini_options]
 markers = [
